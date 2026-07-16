@@ -5,6 +5,7 @@ All interactions with the trading platform go through run_command()
 
 import json
 import subprocess
+from decimal import Decimal 
 
 class RapidXError(Exception):
     """
@@ -50,6 +51,17 @@ def get_ticker(symbol: str) -> dict:
     return run_command("market", "get-ticker", "--input", json.dumps({"symbol" : symbol}))
 
 def get_portfolio_overview() -> dict:
-    """ Account summary: equity, balances, margin """
-    return run_command("portfolio", "overview")
+    """ Account summary for Binance portfolio: equity, balances, margin """
+    response = run_command("portfolio", "overview")
+
+    rows = response.get("data", [])
+    for row in rows:
+        if row.get("exchangeType") == "BINANCE":
+            return row
+    
+    raise RuntimeError(f"No Binance portfolio row found in overview response: {response!r}")
+
+def get_equity() -> Decimal:
+    return Decimal(get_portfolio_overview()["equity"])
+
 

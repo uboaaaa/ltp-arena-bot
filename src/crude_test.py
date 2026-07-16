@@ -1,4 +1,4 @@
-from broker.rapidx import get_ticker, get_portfolio_overview
+from broker.rapidx import get_ticker, get_portfolio_overview, get_equity
 import json 
 
 print('--ticker--')
@@ -8,3 +8,7 @@ print(f"BTC last price: {t['lastPrice']} (24h change {t['priceChangePercent']}%)
 print('--portfolio--')
 p = get_portfolio_overview()
 print(json.dumps(p, indent=2))
+
+print('--equity--')
+e = get_equity()
+print(f"Equity: {e} USDT")
