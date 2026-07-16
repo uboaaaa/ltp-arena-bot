@@ -1,0 +1,16 @@
+# Secrets
+.env
+*.pem
+
+# Py junk
+__pycache__/
+*.pyc
+.venv/
+
+# Editor / OS
+.vscode/
+.DS_Store
+
+# Logs
+*.log
+data/
