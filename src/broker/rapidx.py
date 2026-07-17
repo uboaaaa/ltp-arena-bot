@@ -5,6 +5,8 @@ All interactions with the trading platform go through run_command()
 
 import json
 import subprocess
+import secrets
+import time
 from decimal import Decimal 
 
 class RapidXError(Exception):
@@ -63,5 +65,48 @@ def get_portfolio_overview() -> dict:
 
 def get_equity() -> Decimal:
     return Decimal(get_portfolio_overview()["equity"])
+
+def new_client_order_id(prefix: str = "bot") -> str:
+    """ Unique sortable order ID; prefix + millisecond timestamp + random hex suffix """
+    millis = int(time.time() * 1000)
+    suffix = secrets.token_hex(2)
+    return f"{prefix}-{millis}-{suffix}"
+
+def get_symbol_info(symbol: str) -> dict:
+    """ Trading rules for a symbol: minNotional, lotSize, tickSize, contractSize """
+    return run_command("market", "get-symbol-info", "--input", json.dumps({"symbol" : symbol}))
+
+def place_order_preview(order: dict) -> dict:
+    """ Validate an order without placing it. Returns previewId and submitToken """
+    return run_command("order", "place-preview", "--input", json.dumps(order))
+
+def place_order_submit(order: dict, preview: dict) -> dict:
+    """ Submit a previously previewed order """
+    submission = {
+        **order,
+        "previewId" : preview["previewId"],
+        "continueConsentId" : preview["confirmation"]["submitToken"]
+    }
+    return run_command("order", "place", "--input", json.dumps(submission))
+
+def place_order(order: dict) -> dict:
+    """ Combined order-placing flow: first preview, then submit. Returns the submit response """
+    preview = place_order_preview(order)
+    return place_order_submit(order, preview)
+
+def query_order(client_order_id: str) -> dict:
+    """ Current state of an order (status, filled quantity, etc.)"""
+    return run_command("order", "query", "--input", json.dumps({"clientOrderId" : client_order_id}))
+
+def cancel_order(client_order_id: str) -> dict:
+    """ Cancel an open order. Follows the same structure as writing, i.e., preview + submit. """
+    cancel_input = {"clientOrderId" : client_order_id}
+    preview = run_command("order", "cancel-preview", "--input", json.dumps(cancel_input))
+    submission = {
+        **cancel_input,
+        "previewId" : preview["previewId"],
+        "continueConsentId" : preview["confirmation"]["submitToken"]
+    }
+    return run_command("order", "cancel", "--input", json.dumps(submission))
 
 
