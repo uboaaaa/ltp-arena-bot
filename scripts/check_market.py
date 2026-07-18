@@ -1,3 +1,6 @@
+import sys, pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "src"))
+
 from broker.rapidx import get_ticker, get_portfolio_overview, get_equity
 import json 
 

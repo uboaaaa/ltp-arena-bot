@@ -1,5 +1,8 @@
 """ Position lifecycle test: buy small -> inspect position -> close -> confirm flat """
 
+import sys, pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "src"))
+
 import json
 import time 
 from decimal import Decimal

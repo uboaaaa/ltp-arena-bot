@@ -3,6 +3,9 @@ Full order lifecycle test: preview -> place -> query -> cancel
 This order test is unfillable by design, and is a post-only limit buy priced far below the market.
 """
 
+import sys, pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "src"))
+
 import json
 import time
 from decimal import Decimal, ROUND_DOWN

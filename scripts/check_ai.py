@@ -1,11 +1,15 @@
 """ Decision-prompt test for the AI gateway """
 
+import sys, pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "src"))
+
 import json 
 import os
 import time 
 from openai import OpenAI
 
 from broker.rapidx import get_ticker
+from ai.parsing import parse_llm_decision  
 
 client = OpenAI(
     api_key=os.environ["AI_API_KEY"],
@@ -41,5 +45,8 @@ print(f'Elapsed: {elapsed:.1f}s')
 print(f'usage: {response.usage}')
 print(f'raw reply:\n{raw}')
 
-decision = json.loads(raw)
-print(f'parsed OK: {decision}')
+decision = parse_llm_decision(raw)
+if decision is None:
+    print(f"REPLY UNPARSEABLE. Skip LLM decision this cycle: \n{raw!r}")
+else:
+    print(f"Parsed OK: {decision}")

@@ -6,6 +6,7 @@
 __pycache__/
 *.pyc
 .venv/
+.pytest_cache/
 
 # Editor / OS
 .vscode/
@@ -14,3 +15,6 @@ __pycache__/
 # Logs
 *.log
 data/
+
+# RapidX
+.rapidx/
