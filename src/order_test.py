@@ -13,7 +13,9 @@ from broker.rapidx import (
     new_client_order_id,
     place_order,
     query_order,
-    cancel_order
+    cancel_order,
+    snap_down,
+    snap_up
 )
 
 SYMBOL = "BINANCE_PERP_BTC_USDT"
@@ -30,11 +32,10 @@ min_notional = Decimal(str(info["minNotional"]))
 #--- 2. compute valid order ---
 last_price = Decimal(str(get_ticker(SYMBOL)["lastPrice"]))
 raw_price = last_price * Decimal("0.80")
-price = raw_price.quantize(tick_size, rounding=ROUND_DOWN)
+price = snap_down(raw_price, tick_size)
 
 raw_quantity = min_notional / price
-lots = (raw_quantity / lot_size).to_integral_value(rounding="ROUND_UP")
-quantity = lots * lot_size
+quantity = snap_up(raw_quantity, lot_size)
 
 notional = price * quantity
 print(f'\nmarket={last_price}  our price={price}  qty={quantity}  notional={notional}')

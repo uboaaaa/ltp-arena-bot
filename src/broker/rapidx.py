@@ -7,7 +7,7 @@ import json
 import subprocess
 import secrets
 import time
-from decimal import Decimal 
+from decimal import Decimal, ROUND_DOWN, ROUND_UP 
 
 class RapidXError(Exception):
     """
@@ -74,7 +74,8 @@ def new_client_order_id(prefix: str = "bot") -> str:
 
 def get_symbol_info(symbol: str) -> dict:
     """ Trading rules for a symbol: minNotional, lotSize, tickSize, contractSize """
-    return run_command("market", "get-symbol-info", "--input", json.dumps({"symbol" : symbol}))
+    response = run_command("market", "get-symbol-info", "--input", json.dumps({"symbol" : symbol}))
+    return response["data"][symbol]
 
 def place_order_preview(order: dict) -> dict:
     """ Validate an order without placing it. Returns previewId and submitToken """
@@ -108,5 +109,41 @@ def cancel_order(client_order_id: str) -> dict:
         "continueConsentId" : preview["confirmation"]["submitToken"]
     }
     return run_command("order", "cancel", "--input", json.dumps(submission))
+
+def snap_down(value : Decimal, step : Decimal) -> Decimal:
+    """ Largest multiple of step that is <= value (e.g, price onto tickSize) """
+    return (value / step).to_integral_value(rounding=ROUND_DOWN) * step
+
+def snap_up(value : Decimal, step : Decimal) -> Decimal:
+    """ Smallest multiple of step that >= value (e.g., qty up to lotSize) """
+    return (value / step).to_integral_value(rounding=ROUND_UP) * step
+
+def get_positions() -> list:
+    """ FOR DIAGNOSIS / TESTING. All open positions (empty list when flat) """
+    response = run_command("position", "query")
+    return response.get("data", [])
+
+def get_open_positions() -> list:
+    """ FOR TRADING. Get positions with nonzero quantity (i.e., truly open exposure) """
+    rows = run_command("position", "query").get("data", [])
+    return [r for r in rows if Decimal(str(r.get("positionQty", "0"))) != 0] 
+
+def close_position(symbol: str, max_notional: str) -> dict:
+    """ Close the open position on a symbol.
+    max_notional: safety cap in USDT. Set a bit above position's value """
+    preview = run_command("trade", "preview", "--input", json.dumps({
+        "targetCapabilityId" : "position.close",
+        "symbol" : symbol,
+        "reduceOnly" : True,
+        "maxNotional" : max_notional
+    }))
+    submission = {
+        "symbol" : symbol,
+        "reduceOnly" : True,
+        "maxNotional" : max_notional,
+        "previewId" : preview["previewId"],
+        "continueConsentId" : preview["confirmation"]["submitToken"]
+    }
+    return run_command("position", "close", "--input", json.dumps(submission))
 
 
