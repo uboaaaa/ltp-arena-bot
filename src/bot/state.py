@@ -9,6 +9,8 @@ class BotState:
         self.positions_updated_at: float = 0.0
         self.last_decision: dict | None = None
         self.last_decision_at: float = 0.0
+        self.last_entry_at: float = 0.0
+        self.last_write_at: float = 0.0
         self.halted: bool = False
         self.halt_reason: str | None = None
     
@@ -24,6 +26,7 @@ class BotState:
         self.last_decision = decision
         self.last_decision_at = time.time()
     
+    @property
     def equity_age(self) -> float:
         """ Seconds since equity was last read successfully """
         return time.time() - self.equity_updated_at
@@ -32,7 +35,7 @@ class BotState:
         """ One line status for heartbeat """
         action = self.last_decision["action"] if self.last_decision else "none"
         return (
-            f"equity={self.equity} (age {self.equity_age():.0f}s)"
+            f"equity={self.equity} (age {self.equity_age:.0f}s)"
             f"\npositions={len(self.open_positions)}"
             f"\nlast_decision={action}"
             f"\nhalted={self.halted}"

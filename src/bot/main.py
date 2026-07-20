@@ -7,6 +7,7 @@ import logging
 
 from ai.client import ask_llm
 from ai.parsing import parse_llm_decision
+from ai.prompt import build_prompt
 from bot.config import (
     EXECUTION_ENABLED,
     SOFT_HALT_EQUITY,
@@ -17,10 +18,15 @@ from bot.config import (
     SYMBOL
 )
 from bot.state import BotState
+from bot.execution import execute_decision
 from broker.rapidx import (
     get_equity, 
     get_open_positions,
-    get_ticker
+    get_ticker,
+    get_klines,
+    get_funding_rate,
+    cancel_all_orders,
+    close_all_positions
 )
 
 log = logging.getLogger("bot")
@@ -62,25 +68,16 @@ async def risk_monitor(state: BotState) -> None:
                 log.critical("HARD LIMIT BREACHED: %s", state.halt_reason)
                 if EXECUTION_ENABLED:
                     log.critical("flattening everything")
-                    # TODO: cancel all orders and close all positions here
+                    try:
+                        await asyncio.to_thread(cancel_all_orders)
+                        await asyncio.to_thread(close_all_positions)
+                    except Exception:
+                        log.exception("FLATTEN FAILED. INTERVENE MANUALLY")
+
         except Exception as e:
-            log.warning("risk cycle faild (%s) - equity age now %.0fs", e, state.equity_age())
+            log.warning("risk cycle faild (%s) - equity age now %.0fs", e, state.equity_age)
             
         await asyncio.sleep(RISK_INTERVAL)
-
-def build_prompt(ticker: dict, state: BotState) -> str:
-    return f"""You are the decision engine of a crypto trading bot.
-
-    Current market data for BTC perpetual:
-    - last price : {ticker['lastPrice']}
-    - 24hr change : {ticker['priceChangePercent']}%
-    - 24hr high/low : {ticker['highPrice']} / {ticker['lowPrice']}
-
-    Our account: equity {state.equity}, {len(state.open_positions)} open position(s). 
-    RULES: We are eliminated if we ever lose 20% of the account. USE CAUTION!
-
-    Reply with ONLY a JSON object, no other text:
-    {{"action": "LONG" | "SHORT" | "FLAT", "confidence": 0.0-1.0, "reasoning": "one sentence"}}"""
 
 async def strategy_loop(state: BotState) -> None:
     while True:
@@ -89,7 +86,10 @@ async def strategy_loop(state: BotState) -> None:
                 log.info("strategy: halted (%s). observing only", state.halt_reason)
             else:
                 ticker = await asyncio.to_thread(get_ticker, SYMBOL)
-                prompt = build_prompt(ticker, state)
+                klines = await asyncio.to_thread(get_klines, SYMBOL)
+                funding = await asyncio.to_thread(get_funding_rate, SYMBOL)
+                headlines = [] # TODO: headlines integration goes here
+                prompt = build_prompt(ticker, klines, funding, headlines, state)
                 raw = await asyncio.to_thread(ask_llm, prompt)
                 decision = parse_llm_decision(raw)
                 if decision is None:
@@ -98,8 +98,8 @@ async def strategy_loop(state: BotState) -> None:
                     state.update_decision(decision)
                     log.info("strategy: decision=%s   conf=%f   reason=%s", decision['action'], decision['confidence'], decision['reasoning'])
                     if EXECUTION_ENABLED:
-                        log.info("strategy: execution happens here")
-                        # TODO: execution logic here
+                        result = await asyncio.to_thread(execute_decision, state, decision)
+                        log.info("execution summary: %s", json.dumps(result, default=str))
                     else:
                         log.info("strategy: EXECUTION DISABLED - LOG ONLY")
         except Exception:

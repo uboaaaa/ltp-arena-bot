@@ -146,4 +146,30 @@ def close_position(symbol: str, max_notional: str) -> dict:
     }
     return run_command("position", "close", "--input", json.dumps(submission))
 
+def get_klines(symbol: str, interval: str ="1h", limit: int = 12) -> list:
+    """ Returns candles of given symbol in given interval, oldest to newest """
+    response = run_command("market", "get-klines", "--input", json.dumps({"symbol" : symbol, "interval" : interval, "limit" : limit}))
+    return response.get("data", response) if isinstance(response, dict) else response
+
+def get_funding_rate(symbol: str) -> dict:
+    response = run_command("market", "get-funding-rate", "--input", json.dumps({"symbol" : symbol}))
+    return response.get("data", response) if isinstance(response, dict) else response
+
+def _submit_with_preview(target_capability: str, submit_domain: str, submit_action: str, payload: dict) -> dict:
+    """" Generic preview -> submit for position-domain writes """
+    preview = run_command("trade", "preview", "--input", json.dumps({"targetCapabilityId" : target_capability, **payload}))
+    submission = {
+        **payload,
+        "previewId" : preview["previewId"],
+        "continueConsentId" : preview["confirmation"]["submitToken"]
+    }
+    return run_command(submit_domain, submit_action, "--input", json.dumps(submission))
+
+def cancel_all_orders() -> dict:
+    return _submit_with_preview("order.cancel-all", "order", "cancel-all", {})
+
+def close_all_positions() -> dict:
+    return _submit_with_preview("position.close-all", "position", "close-all", {"reduceOnly" : True, "maxNotional" : max_notional})
+
+
 
