@@ -1,8 +1,21 @@
 """ Turn LLM replies into validated decision dicts. Every AI response passes through parse_llm_decision(). Usable decisions come back as dicts, else None"""
 
-import json 
+import json
+from decimal import Decimal, InvalidOperation
+
+from bot.config import (
+    MIN_TP_PCT,
+    MAX_TP_PCT,
+    MIN_SL_PCT,
+    MAX_SL_PCT,
+    DEFAULT_TP_PCT,
+    DEFAULT_SL_PCT
+)
 
 ALLOWED_ACTIONS = {"LONG", "SHORT", "FLAT"}
+
+def _clamp(value: Decimal, lo: Decimal, hi: Decimal) -> Decimal:
+    return max(lo, min(hi, value))
 
 def extract_json_block(raw: str) -> str | None:
     """ Pull the JSON object out of possibly-decorated model text """
@@ -39,4 +52,18 @@ def parse_llm_decision(raw: str) -> str | None:
     if not isinstance(reasoning, str) or not reasoning.strip():
         return None
     
-    return {"action" : action, "confidence" : float(confidence), "reasoning" : reasoning}
+    result = {"action" : action, "confidence" : float(confidence), "reasoning" : reasoning}
+    
+    if action != "FLAT":
+        try:
+            tp = Decimal(str(decision["trake_profit_pct"]))
+        except (KeyError, TypeError, InvalidOperation):
+            tp = DEFAULT_TP_PCT
+        try:
+            sl = Decimal(str(decision["stop_loss_pct"]))
+        except (KeyError, TypeError, InvalidOperation):
+            sl = DEFAULT_SL_PCT
+        result["take_profit_pct"] = _clamp(tp, MIN_TP_PCT, MAX_TP_PCT)
+        result["stop_loss_pct"] = _clamp(sl, MIN_SL_PCT, MAX_SL_PCT)
+
+    return result 

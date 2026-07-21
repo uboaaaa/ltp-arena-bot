@@ -13,6 +13,8 @@ class BotState:
         self.last_write_at: float = 0.0
         self.halted: bool = False
         self.halt_reason: str | None = None
+        self.pending_signal: str | None = None
+        self.active_plan: dict | None = None
     
     def update_equity(self, equity: Decimal) -> None:
         self.equity = equity

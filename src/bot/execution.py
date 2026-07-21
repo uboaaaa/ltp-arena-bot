@@ -12,8 +12,12 @@ from bot.config import (
     BASE_POSITION_FRACTION,
     CONF_FLOOR,
     CONF_FULL,
+    DEFAULT_SL_PCT,
+    DEFAULT_TP_PCT,
     MAX_EQUITY_AGE,
+    MAX_POSITION_AGE_SECONDS,
     MIN_HOLD_SECONDS,
+    REQUIRE_CONFIRMATION,
     SOFT_HALT_EQUITY,
     SYMBOL,
     WRITE_SPACING
@@ -47,15 +51,16 @@ def current_stance(open_positions: list) -> str:
     return "FLAT"
 
 def decide_transition(stance: str, action: str, confidence: float) -> str:
-    """ Returns one of: (OPEN_LONG, OPEN_SHORT, CLOSE, CLOSE_THEN_SHORT, CLOSE_THEN_LONG, HOLD, NONE) """
-    if action == stance:
-        return "HOLD" if stance != "FLAT" else "NONE"
+    """ When a position is open, bracket owns the exit. Only strong opposite signal overrides it, and all weak disagreements are ignored as noise """
     if stance == "FLAT":
-        return {"LONG": "OPEN_LONG", "SHORT": "OPEN_SHORT"}[action]
-    if action == "FLAT": # if we hold a position and the advice differs, close it
-        return "CLOSE"
-    reverse = "CLOSE_THEN_SHORT" if action == "SHORT" else "CLOSE_THEN_LONG" # reverse on high conviction, otherwise just get flat
-    return reverse if confidence >= CONF_FULL else "CLOSE"
+        if action == "FLAT":
+            return "NONE"
+        return "OPEN_LONG" if action == "LONG" else "OPEN_SHORT"
+    if action == stance:
+        return "HOLD"
+    if action != "FLAT" and confidence >= CONF_FULL:
+        return "CLOSE_THEN_SHORT" if action =="SHORT" else "CLOSE_THEN_LONG"
+    return "HOLD"
 
 def conviction_multiplier(confidence: float) -> Decimal:
     """ if less than floor, return 0 (i.e., do not trade). if between floor and full, return half mult. if beyond full, return full mult. """
@@ -98,6 +103,35 @@ def gate_check(state, transition: str) -> list[str]:
     
     return reasons
 
+def check_bracket(state) -> tuple[str, Decimal] | None:
+    """ Return (trigger, pnl_pct) if the open position has hit its plan """
+    rows = [r for r in state.open_positions if r.get('sym') == SYMBOL]
+    if not rows:
+        return None
+    row = rows[0]
+    qty = Decimal(str(row.get("positionQty", "0")))
+    avg = Decimal(str(row.get("avgPrice", "0")))
+    mark = Decimal(str(row.get("markPrice", "0")))
+    if qty == 0 or avg <= 0 or mark <= 0:
+        return None
+    
+    direction = Decimal("1") if qty > 0 else Decimal("-1")
+    pnl_pct = (mark - avg) / avg * Decimal("100") * direction
+
+    plan = state.active_plan or {}
+    tp = plan.get("tp_pct", DEFAULT_TP_PCT)
+    sl = plan.get("sl_pct", DEFAULT_SL_PCT)
+    opened_at = plan.get("opened_at", 0.0)
+
+    if pnl_pct >= tp:
+        return ("take_profit", pnl_pct)
+    if pnl_pct <= -sl:
+        return ("stop_loss", pnl_pct)
+    if opened_at and time.time() - opened_at > MAX_POSITION_AGE_SECONDS:
+        return ("max_age", pnl_pct)
+    
+    return None
+
 # --- orchestration (run via to_thread)---
 def _wait_terminal(client_order_id: str, tries: int=10) -> dict:
     for _ in range(tries):
@@ -107,7 +141,7 @@ def _wait_terminal(client_order_id: str, tries: int=10) -> dict:
             return order_state
     return order_state
 
-def _open(side: str, qty: Decimal, price_cap: Decimal, state) -> dict:
+def _open(side, qty, price_cap, state, decision, decision_id) -> dict:
     order = {
         "symbol" : SYMBOL,
         "side" : side,
@@ -124,10 +158,17 @@ def _open(side: str, qty: Decimal, price_cap: Decimal, state) -> dict:
     result = _wait_terminal(order["clientOrderId"])
     if result.get("orderState") == "FILLED":
         state.last_entry_at = time.time()
+        state.active_plan = {
+            "tp_pct" : decision["take_profit_pct"],
+            "sl_pct" : decision["stop_loss_pct"],
+            "decision_id" : decision_id,
+            "opened_at" : time.time(),
+            "side" : "LONG" if side == "BUY" else "SHORT",
+        }
     log.info("EXECUTE result: state=%s  filled=%s  avg=%s", result.get("orderState"), result.get("executedQty"), result.get("executedAvgPrice"))
     return result
 
-def execute_decision(state, decision: dict) -> dict:
+def execute_decision(state, decision: dict, decision_id) -> dict:
     """ FULL PIPELINE: stance -> transition -> gate -> orders.
     Retuns summary dict for reasoning logs """
     summary = {"decision" : decision, "transition" : None, "gate" : [], "orders" : []}
@@ -135,8 +176,19 @@ def execute_decision(state, decision: dict) -> dict:
     transition = decide_transition(stance, decision["action"], decision["confidence"])
     summary["transition"] = f"{stance} -> {transition}"
     log.info("EXECUTE transition: %s (conf %.2f)", summary["transition"], decision["confidence"])
+
     if transition in ("NONE", "HOLD"):
         return summary
+    
+    proposed = decision["action"]
+    if transition.startswith(("OPEN", "CLOSE_THEN")) and REQUIRE_CONFIRMATION:
+        if state.pending_signal != proposed:
+            state.pending_signal = proposed
+            reason = f"awaiting confirmation: {proposed} seen once, need two consecutive"
+            summary["gate"] = [reason]
+            log.info("EXECUTE debounced: %s", reason)
+            return summary
+    state.pending_signal = proposed
     
     reasons = gate_check(state, transition)
     summary["gate"] = reasons

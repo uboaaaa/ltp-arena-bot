@@ -4,6 +4,7 @@ Run using: python3 -m bot.main (from src/) """
 import asyncio
 import json
 import logging
+import time
 
 # ai imports
 from ai.client import ask_llm
@@ -21,7 +22,10 @@ from bot.config import (
     SYMBOL
 )
 from bot.state import BotState
-from bot.execution import execute_decision
+from bot.execution import (
+    execute_decision,
+    check_bracket
+)
 from bot import journal
 
 # broker imports
@@ -72,6 +76,26 @@ async def risk_monitor(state: BotState) -> None:
             positions = await asyncio.to_thread(get_open_positions)
             state.update_positions(positions)
 
+            trigger = check_bracket(state)
+            if trigger:
+                reason, pnl_pct = trigger
+                log.info("BRACKET %s at %+.3f%%", reason, pnl_pct)
+                if EXECUTION_ENABLED:
+                    result = await asyncio.to_thread(
+                        close_position,
+                        SYMBOL,
+                        str(state.equity or 1000)
+                    )
+                    journal.record({
+                        "event" : "bracket_exit",
+                        "trigger" : reason,
+                        "pnl_pct" : str(pnl_pct),
+                        "decision_id" : (state.active_plan or {}).get("decision_id"),
+                        "plan" : {k: str(v) for k, v in (state.active_plan or {}).items()},
+                        "result" : result,
+                    })
+                    state.active_plan = None 
+
             if equity < HARD_FLATTEN_EQUITY and not state.halted:
                 state.halted = True
                 state.halt_reason = f"equity {equity} < hard limit {HARD_FLATTEN_EQUITY}"
@@ -85,7 +109,7 @@ async def risk_monitor(state: BotState) -> None:
                         log.exception("FLATTEN FAILED. INTERVENE MANUALLY")
 
         except Exception as e:
-            log.warning("risk cycle faild (%s) - equity age now %.0fs", e, state.equity_age)
+            log.warning("risk cycle failed (%s) - equity age now %.0fs", e, state.equity_age)
             
         await asyncio.sleep(RISK_INTERVAL)
 
@@ -103,8 +127,10 @@ async def strategy_loop(state: BotState) -> None:
                 prompt = build_prompt(ticker, klines, funding, headlines, state)
                 raw = await asyncio.to_thread(ask_llm, prompt)
                 decision = parse_llm_decision(raw)
+                decision_id = f"d-{int(time.time() * 1000)}"
 
                 entry = {
+                    "decision_id" : decision_id,
                     "equity" : str(state.equity),
                     "prompt" : prompt,
                     "raw_reply" : raw,
@@ -118,7 +144,7 @@ async def strategy_loop(state: BotState) -> None:
                     state.update_decision(decision)
                     log.info("strategy: decision=%s   conf=%f   reason=%s", decision['action'], decision['confidence'], decision['reasoning'])
                     if EXECUTION_ENABLED:
-                        result = await asyncio.to_thread(execute_decision, state, decision)
+                        result = await asyncio.to_thread(execute_decision, state, decision, decision_id)
                         entry["execution"] = result
                         log.info("execution summary: %s", json.dumps(result, default=str))
                     else:
