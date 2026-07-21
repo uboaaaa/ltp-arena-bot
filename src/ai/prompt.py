@@ -3,23 +3,32 @@
 from decimal import Decimal
 
 PROMPT_HEADER = """
+You are the decision engine of an automated crypto trading bot in a \
+competition scored on risk-adjusted return (Sharpe), profit, and ROI. Sitting flat for \
+the whole competition scores zero, so you are expected to take a position whenever the \
+evidence leans even mildly in one direction.
 
-You are the decision engine of an automated crypto trading bot \
-in a competition scored on Sharpe ratio, PnL, and ROI. Staying flat forever scores \
-zero - you are expected to find modest, defensible opportunities.
+A deterministic risk system below you makes every position small (a few percent of equity \
+at 1x leverage), so a wrong call costs only a fraction of a percent of the account. Do not \
+manage account-level risk - that is handled for you. Your job is judgment: direction and \
+conviction on the evidence.
 
-A separate deterministic risk system sits below you: your position size is capped \
-at a small fraction of equity at 1x leverage, so a wrong call costs a fraction of a \
-percent of the account, never more. Do not manage account-level risk - that is \
-handled for you. Your job is judgment: direction and conviction on the evidence.
+Your confidence value directly controls position size, so calibrate it honestly: below 0.6 \
+takes NO position (use only when you are genuinely unsure of direction), 0.6 to 0.8 takes a \
+small position, and above 0.8 takes a larger one. When you lean a direction clearly enough \
+to act, use 0.6 or higher, and scale up toward 0.9 as the signal gets stronger and cleaner. \
+Do not cluster around one value - let it reflect how strong the evidence actually is.
 
-Prefer entries where recent momentum, range position, and news agree; prefer FLAT \
-only when the evidence genuinely conflicts. A round-trip trade costs about 0.08% in \
-fees, so only advise a position you'd expect to beat that.
+Read whichever regime fits the recent candles:
+- Trending: if there is a clear direction, lean with it.
+- Rangebound: if price is oscillating in a range with no trend, fade the extremes - near the \
+range high favors SHORT, near the range low favors LONG.
+
+Base your decision only on the evidence provided below. Do not treat any missing or \
+unavailable data as a reason to avoid trading.
 
 Reply with ONLY a JSON object, no other text:
 {"action": "LONG" | "SHORT" | "FLAT", "confidence": 0.0-1.0, "reasoning": "one sentence citing the evidence"}
-
 """
 
 def summarize_klines(klines_response) -> str:
@@ -41,13 +50,15 @@ def summarize_klines(klines_response) -> str:
 def build_prompt(ticker: dict, klines_response, funding_rows, headlines, state) -> str:
     """ assembles full decision prompt from collated market data """
     funding = funding_rows[0]["fundingRate"] if funding_rows else "unknown"
-    news = "\n".join(f"- {h}" for h in headlines[:5]) if headlines else "- no notable headlines"
-    return f"""
-    {PROMPT_HEADER}
-    Current evidence for BTC perpetual:
-    - last price: {ticker['lastPrice']} (24h {ticker['priceChangePercent']}%, range {ticker['lowPrice']} - {ticker['highPrice']})
-    - recent candles: {summarize_klines(klines_response)}
-    - funding rate: {funding}
-    - recent headlines: {news}
-    - our stance: {"holding a position" if state.open_positions else "flat"}
-    """
+    evidence = [
+        f"- last price: {ticker["lastPrice"]} (24h {ticker["priceChangePercent"]}%)",
+        f"- range: {ticker['lowPrice']} - {ticker['highPrice']}",
+        f"- recent candles: {summarize_klines(klines_response)}",
+        f"- funding rate: {funding}"
+    ]
+    if headlines:
+        news = "\n".join(f" - {h}" for h in headlines[:5])
+        evidence.append(f"- recent headlines:\n{news}")
+
+    evidence.append(f"- our stance: {'holding a position' if state.open_positions else 'flat'}")
+    return f"{PROMPT_HEADER}\nCurrent evidence for BTC perpetual:\n" + "\n".join(evidence)

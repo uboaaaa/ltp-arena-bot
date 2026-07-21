@@ -5,9 +5,12 @@ import asyncio
 import json
 import logging
 
+# ai imports
 from ai.client import ask_llm
 from ai.parsing import parse_llm_decision
 from ai.prompt import build_prompt
+
+# bot imports
 from bot.config import (
     EXECUTION_ENABLED,
     SOFT_HALT_EQUITY,
@@ -19,6 +22,9 @@ from bot.config import (
 )
 from bot.state import BotState
 from bot.execution import execute_decision
+from bot import journal
+
+# broker imports
 from broker.rapidx import (
     get_equity, 
     get_open_positions,
@@ -29,12 +35,16 @@ from broker.rapidx import (
     close_all_positions
 )
 
+# other
+from openai import RateLimitError
+from logging.handlers import RotatingFileHandler
+
 log = logging.getLogger("bot")
 
 def setup_logging() -> None:
     fmt = "%(asctime)s %(levelname)-8s %(name)s: %(message)s"
     logging.basicConfig(level=logging.INFO, format=fmt)
-    file_handler = logging.FileHandler("bot.log")
+    file_handler = RotatingFileHandler("bot.log", maxBytes=5_000_000, backupCount=3)
     file_handler.setFormatter(logging.Formatter(fmt))
     logging.getLogger().addHandler(file_handler)
     logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -92,6 +102,15 @@ async def strategy_loop(state: BotState) -> None:
                 prompt = build_prompt(ticker, klines, funding, headlines, state)
                 raw = await asyncio.to_thread(ask_llm, prompt)
                 decision = parse_llm_decision(raw)
+
+                entry = {
+                    "equity" : str(state.equity),
+                    "prompt" : prompt,
+                    "raw_reply" : raw,
+                    "decision" : decision,
+                    "execution" : None,
+                }
+
                 if decision is None:
                     log.warning("strategy: unparseable AI reply, skipping cycle: %r", raw)
                 else:
@@ -99,9 +118,15 @@ async def strategy_loop(state: BotState) -> None:
                     log.info("strategy: decision=%s   conf=%f   reason=%s", decision['action'], decision['confidence'], decision['reasoning'])
                     if EXECUTION_ENABLED:
                         result = await asyncio.to_thread(execute_decision, state, decision)
+                        entry["execution"] = result
                         log.info("execution summary: %s", json.dumps(result, default=str))
                     else:
                         log.info("strategy: EXECUTION DISABLED - LOG ONLY")
+                
+                journal.record(entry)
+
+        # TODO: add openai ratelimiting case
+
         except Exception:
             log.exception("strategy cycle failed. will retry next interval!")
         
