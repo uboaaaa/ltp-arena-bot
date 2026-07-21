@@ -39,6 +39,10 @@ from broker.rapidx import (
     close_all_positions
 )
 
+# feed imports
+from feeds import sosovalue
+from feeds.news import import get_recent_headlines as ltp_headlines 
+
 # other
 from openai import RateLimitError
 from logging.handlers import RotatingFileHandler
@@ -123,7 +127,15 @@ async def strategy_loop(state: BotState) -> None:
                 ticker = await asyncio.to_thread(get_ticker, SYMBOL)
                 klines = await asyncio.to_thread(get_klines, SYMBOL)
                 funding = await asyncio.to_thread(get_funding_rate, SYMBOL)
-                headlines = [] # TODO: headlines integration goes here
+                
+                try:
+                    headlines = await asyncio.to_thread(sosovalue.get_recent_headlines)
+                    if not headlines:
+                        headlines = await asyncio.to_thread(ltp_headlines)
+                except Exception:
+                    log.warning("news fetch failed. continuing without headlines.", exc_info=True)
+                    headlines = []
+
                 prompt = build_prompt(ticker, klines, funding, headlines, state)
                 raw = await asyncio.to_thread(ask_llm, prompt)
                 decision = parse_llm_decision(raw)

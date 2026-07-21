@@ -23,6 +23,11 @@ Read whichever regime fits the recent candles:
 - Rangebound: if price is oscillating in a range with no trend, fade the extremes - near the \
 range high favors SHORT, near the range low favors LONG.
 
+When headlines are provided, weigh them explicitly. A concrete catalyst - a regulatory \
+decision, large fund flows, a major liquidation, a notable whale move - can justify a \
+directional view that price action alone would not support, and can also argue against one. \
+Say in your reasoning how the news affected your call, including when you judged it irrelevant.
+
 When you choose LONG or SHORT you must also specify the trade plan. take_profit_pct is how \
 far price must move in your favor, as a percent, before the position is closed at a profit. \
 stop_loss_pct is how far it may move against you before the position is cut. These are \
