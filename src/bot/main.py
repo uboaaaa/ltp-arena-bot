@@ -91,6 +91,7 @@ async def risk_monitor(state: BotState) -> None:
 
 async def strategy_loop(state: BotState) -> None:
     while True:
+        sleep_for = STRATEGY_INTERVAL
         try:
             if state.halted:
                 log.info("strategy: halted (%s). observing only", state.halt_reason)
@@ -125,7 +126,9 @@ async def strategy_loop(state: BotState) -> None:
                 
                 journal.record(entry)
 
-        # TODO: add openai ratelimiting case
+        except RateLimitError:
+            sleep_for = 1800
+            log.warning("AI budget exhausted (HTTP 429). Backing off for %ds", sleep_for)
 
         except Exception:
             log.exception("strategy cycle failed. will retry next interval!")
