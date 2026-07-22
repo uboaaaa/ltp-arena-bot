@@ -149,7 +149,7 @@ def _open(side, qty, price_cap, state, decision, decision_id) -> dict:
         "orderType" : "LIMIT",
         "price" : str(price_cap),
         "quantity" : str(qty),
-        "maxNotional" : str(price_cap * qty),
+        "maxNotional" : str((price_cap * qty * Decimal("1.05")).quantize(Decimal("0.01"))),
         "clientOrderId" : new_client_order_id("live"),
     }
     log.info("EXECUTE open %s: %s", side, json.dumps(order))
@@ -222,13 +222,13 @@ def execute_decision(state, decision: dict, decision_id) -> dict:
             cap = snap_down(last * Decimal("1.002"), tick)
             summary["orders"].append({
                 "type" : "open_long",
-                "result" : _open("BUY", qty, cap, state)
+                "result" : _open("BUY", qty, cap, state, decision, decision_id)
             })
         else:
             cap = snap_up(last * Decimal("0.998"), tick)
             summary["orders"].append({
                 "type" : "open_short",
-                "result" : _open("SELL", qty, cap, state)
+                "result" : _open("SELL", qty, cap, state, decision, decision_id)
             })
 
     return summary

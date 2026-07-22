@@ -45,7 +45,7 @@ order = {
     "orderType" : "LIMIT",
     "price" : str(cap_price),
     "quantity" : str(quantity),
-    "maxNotional" : str(cap_price * quantity),
+    "maxNotional" : str((price_cap * qty * Decimal("1.05")).quantize(Decimal("0.01"))),
     "clientOrderId" : order_id
 }
 print(f"\n--- buying {quantity} @ cap {cap_price} (last={last})")

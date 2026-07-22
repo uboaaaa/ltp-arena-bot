@@ -14,7 +14,7 @@ SOFT_HALT_EQUITY = Decimal("920")
 HARD_FLATTEN_EQUITY = Decimal("900")
 
 # --- master switch ---
-EXECUTION_ENABLED = False # "True" means orders actually execute. will turn to True during competition period
+EXECUTION_ENABLED = True # "True" means orders actually execute. will turn to True during competition period
 
 # --- AI ---
 AI_MODEL = "MiniMax-M3"
@@ -30,7 +30,7 @@ MAX_SL_PCT = Decimal("1.5")
 DEFAULT_TP_PCT = Decimal("0.6")
 DEFAULT_SL_PCT = Decimal("0.4")
 MAX_POSITION_AGE_SECONDS = 4 * 3600
-REQUIRE_CONFIRMATION = True
+REQUIRE_CONFIRMATION = False
 
 # --- execution ---
 BASE_POSITION_FRACTION = Decimal("0.08")

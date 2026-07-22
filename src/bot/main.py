@@ -36,12 +36,13 @@ from broker.rapidx import (
     get_klines,
     get_funding_rate,
     cancel_all_orders,
-    close_all_positions
+    close_all_positions,
+    close_position
 )
 
 # feed imports
 from feeds import sosovalue
-from feeds.news import import get_recent_headlines as ltp_headlines 
+from feeds.news import get_recent_headlines as ltp_headlines 
 
 # other
 from openai import RateLimitError
@@ -127,7 +128,7 @@ async def strategy_loop(state: BotState) -> None:
                 ticker = await asyncio.to_thread(get_ticker, SYMBOL)
                 klines = await asyncio.to_thread(get_klines, SYMBOL)
                 funding = await asyncio.to_thread(get_funding_rate, SYMBOL)
-                
+
                 try:
                     headlines = await asyncio.to_thread(sosovalue.get_recent_headlines)
                     if not headlines:

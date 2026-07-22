@@ -169,7 +169,21 @@ def cancel_all_orders() -> dict:
     return _submit_with_preview("order.cancel-all", "order", "cancel-all", {})
 
 def close_all_positions() -> dict:
-    return _submit_with_preview("position.close-all", "position", "close-all", {"reduceOnly" : True, "maxNotional" : max_notional})
+    """Emergency close of every open position, using the proven single-symbol
+    close path. More reliable than the untested close-all endpoint."""
+    results = []
+    positions = get_open_positions()
+    for i, row in enumerate(positions):
+        sym = row.get("sym")
+        if not sym:
+            continue
+        if i > 0:
+            time.sleep(6)  # respect the write rate limit between closes
+        try:
+            results.append({"symbol": sym, "result": close_position(sym, "100000")})
+        except Exception as e:
+            results.append({"symbol": sym, "error": str(e)})
+    return {"closed": results}
 
 
 
