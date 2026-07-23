@@ -29,7 +29,9 @@ exceeds that threshold should you trade in the direction of the trend.
 When headlines are provided, weigh them explicitly. A concrete catalyst - a regulatory \
 decision, large fund flows, a major liquidation, a notable whale move - can justify a \
 directional view that price action alone would not support, and can also argue against one. \
-Say in your reasoning how the news affected your call, including when you judged it irrelevant.
+Say in your reasoning how the news affected your call, including when you judged it irrelevant. \
+Set catalyst to true only when a specific headline materially drove your directional choice, not \
+when the news was merely present. 
 
 When you choose LONG or SHORT you must also specify the trade plan. take_profit_pct is how \
 far price must move in your favor, as a percent, before the position is closed at a profit. \
@@ -43,7 +45,7 @@ Base your decision only on the evidence provided below. Do not treat any missing
 unavailable data as a reason to avoid trading.
 
 Reply with ONLY a JSON object, no other text:
-{"action": "LONG" | "SHORT" | "FLAT", "confidence": 0.0-1.0, "take_profit_pct": 0.6, "stop_loss_pct": 0.4, "reasoning": "one sentence citing the evidence"}
+{"action": "LONG" | "SHORT" | "FLAT", "confidence": 0.0-1.0, "take_profit_pct": 0.6, "stop_loss_pct": 0.4, "reasoning": "one sentence citing the evidence", "catalyst": true | false}
 """
 
 def summarize_klines(klines_response) -> str:

@@ -17,6 +17,18 @@ ALLOWED_ACTIONS = {"LONG", "SHORT", "FLAT"}
 def _clamp(value: Decimal, lo: Decimal, hi: Decimal) -> Decimal:
     return max(lo, min(hi, value))
 
+def _coerce_catalyst(value) -> bool:
+    """ Model sometimes stringifies JSON scalars; accept the two unambiguous forms. """
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        text = value.strip().lower()
+        if text == "true":
+            return True
+        if text == "false":
+            return False
+    return False
+
 def extract_json_block(raw: str) -> str | None:
     """ Pull the JSON object out of possibly-decorated model text """
     if not raw:
@@ -44,6 +56,7 @@ def parse_llm_decision(raw: str) -> str | None:
     action = decision.get("action")
     confidence = decision.get("confidence")
     reasoning = decision.get("reasoning")
+    catalyst = decision.get("catalyst")
 
     if action not in ALLOWED_ACTIONS:
         return None
@@ -51,8 +64,8 @@ def parse_llm_decision(raw: str) -> str | None:
         return None
     if not isinstance(reasoning, str) or not reasoning.strip():
         return None
-    
-    result = {"action" : action, "confidence" : float(confidence), "reasoning" : reasoning}
+    result = {"action" : action, "confidence" : float(confidence), "reasoning" : reasoning,
+              "catalyst" : _coerce_catalyst(catalyst)}
     
     if action != "FLAT":
         try:
