@@ -6,12 +6,12 @@ SYMBOL = "BINANCE_PERP_BTC_USDT"
 
 # --- intervals  ---
 RISK_INTERVAL = 10
-STRATEGY_INTERVAL = 600
+STRATEGY_INTERVAL = 300
 HEARTBEAT_INTERVAL = 60
 
 # --- risk thresholds (USDT equity) ---
-SOFT_HALT_EQUITY = Decimal("920")
-HARD_FLATTEN_EQUITY = Decimal("900")
+SOFT_HALT_EQUITY = Decimal("965")
+HARD_FLATTEN_EQUITY = Decimal("955")
 
 # --- master switch ---
 EXECUTION_ENABLED = True # "True" means orders actually execute. will turn to True during competition period
