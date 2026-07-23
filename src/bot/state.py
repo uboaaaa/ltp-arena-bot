@@ -1,5 +1,10 @@
-import time 
+import time
+import json
+import os
+import logging 
 from decimal import Decimal
+
+PLAN_PATH = os.path.join("data", "active_plan.json")
 
 class BotState:
     def __init__(self):
@@ -11,6 +16,8 @@ class BotState:
         self.last_decision_at: float = 0.0
         self.last_entry_at: float = 0.0
         self.last_write_at: float = 0.0
+        self.last_bracket_close_at: float = 0.0
+        self.last_stop_at: float = 0.0
         self.halted: bool = False
         self.halt_reason: str | None = None
         self.pending_signal: str | None = None
@@ -42,3 +49,34 @@ class BotState:
             f"\nlast_decision={action}"
             f"\nhalted={self.halted}"
         )
+    
+    def set_plan(self, plan: dict | None) -> None:
+        """ Set the active trade plan and mirror it to disk so brackets and decision_ids survive a restart """
+        self.active_plan = plan
+        try:
+            os.makedirs("data", exist_ok=True)
+            if plan is None:
+                if os.path.exists(PLAN_PATH):
+                    os.remove(PLAN_PATH)
+            else:
+                with open(PLAN_PATH, "w") as f:
+                    json.dump({k: str(v) for k, v in plan.items()}, f)
+        
+        except Exception:
+            logging.getLogger("bot.state").exception("failed to persist plan")
+    
+    def load_plan(self) -> None:
+        """ Restore a persisted plan after bot restart. Never raises """
+        try:
+            if os.path.exists(PLAN_PATH):
+                with open(PLAN_PATH) as f:
+                    raw = json.load(f)
+                self.active_plan = {
+                    "tp_pct" : Decimal(raw["tp_pct"]),
+                    "sl_pct" : Decimal(raw["sl_pct"]),
+                    "decision_id" : raw.get("decision_id"),
+                    "opened_at" : float(raw.get("opened_at", 0)),
+                    "side" : raw.get("side")
+                }
+        except Exception:
+            logging.getLogger("bot.state").exception("failed to load persisted plan")

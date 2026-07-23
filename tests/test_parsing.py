@@ -1,4 +1,4 @@
-from ai.parsing import extract_json_block, parse_llm_decision
+from ai.parsing import parse_llm_decision
 
 CLEAN = '{"action": "FLAT", "confidence": 0.85, "reasoning": "choppy market"}'
 FENCED = '```json\n{"action": "FLAT", "confidence": 0.5, "reasoning": "no edge"}\n```'

@@ -4,9 +4,6 @@ from decimal import Decimal
 from bot.config import (
     SYMBOL, 
     MAX_POSITION_AGE_SECONDS,
-    REQUIRE_CONFIRMATION,
-    DEFAULT_TP_PCT,
-    DEFAULT_SL_PCT,
 )
 
 from bot.execution import (
@@ -17,6 +14,7 @@ from bot.execution import (
     gate_check,
     check_bracket,
     execute_decision,
+    derive_brackets,
 )
 
 # current stance checks
@@ -115,7 +113,7 @@ class FakeState:
     """ Stripped-down version of BotState for testing pure logic. """
     def __init__(self, halted=False, halt_reason=None, equity=Decimal("1000"),
                  equity_age=1.0, last_entry_at=0.0, last_write_at=0.0,
-                 open_positions=None, active_plan=None, pending_signal=None):
+                 open_positions=None, active_plan=None, pending_signal=None, last_stop_at=0.0):
         self.halted = halted
         self.halt_reason = halt_reason
         self.equity = equity
@@ -125,6 +123,7 @@ class FakeState:
         self.open_positions = open_positions or []
         self.active_plan = active_plan
         self.pending_signal = pending_signal
+        self.last_stop_at = last_stop_at
 
 
 # gate check
@@ -221,22 +220,56 @@ def test_bracket_max_age_closes_a_quiet_position():
 DECISION = {"action": "LONG", "confidence": 0.7, "reasoning": "test",
             "take_profit_pct": Decimal("0.6"), "stop_loss_pct": Decimal("0.4")}
 
-def test_debounce_first_signal_does_not_trade():
+def test_debounce_first_signal_does_not_trade(monkeypatch):
+    import bot.execution as ex
+    monkeypatch.setattr(ex, "REQUIRE_CONFIRMATION", True)
     state = FakeState()
     summary = execute_decision(state, DECISION, "d-1")
     assert any("awaiting confirmation" in r for r in summary["gate"])
     assert summary["orders"] == []
     assert state.pending_signal == "LONG"
 
-def test_debounce_second_matching_signal_clears_confirmation():
+def test_debounce_second_matching_signal_clears_confirmation(monkeypatch):
+    import bot.execution as ex
+    monkeypatch.setattr(ex, "REQUIRE_CONFIRMATION", True)
     # halted so it stops at the risk gate instead of reaching the network
     state = FakeState(pending_signal="LONG", halted=True, halt_reason="test")
     summary = execute_decision(state, DECISION, "d-2")
     assert not any("awaiting confirmation" in r for r in summary["gate"])
     assert any("halted" in r for r in summary["gate"])
 
-def test_debounce_opposite_signal_resets_the_pending_one():
+def test_debounce_opposite_signal_resets_the_pending_one(monkeypatch):
+    import bot.execution as ex
+    monkeypatch.setattr(ex, "REQUIRE_CONFIRMATION", True)
     state = FakeState(pending_signal="LONG")
     summary = execute_decision(state, dict(DECISION, action="SHORT"), "d-3")
     assert any("awaiting confirmation" in r for r in summary["gate"])
     assert state.pending_signal == "SHORT"
+
+
+# volatility checks
+
+def test_derived_brackets_from_volatility():
+    tp, sl = derive_brackets(Decimal("0.5"), Decimal("0.6"), Decimal("0.4"))
+    assert tp == Decimal("0.4")    # 0.5 * 0.8
+    assert sl == Decimal("0.65")   # 0.5 * 1.3
+
+def test_derived_brackets_fall_back_without_vol():
+    assert derive_brackets(None, Decimal("0.6"), Decimal("0.4")) == (Decimal("0.6"), Decimal("0.4"))
+
+def test_gate_blocks_entries_during_stop_cooldown():
+    import time
+    reasons = gate_check(FakeState(last_stop_at=time.time()), "OPEN_LONG")
+    assert any("stop cooldown" in r for r in reasons)
+
+def test_chop_backstop_gates_low_conviction():
+    d = dict(DECISION, confidence=0.65)
+    summary = execute_decision(FakeState(), d, "d-chop",
+                               vol_pct=Decimal("0.5"), chg_12h=Decimal("0.3"))
+    assert any("chop backstop" in r for r in summary["gate"])
+
+def test_chop_backstop_allows_high_conviction():
+    d = dict(DECISION, confidence=0.75)
+    summary = execute_decision(FakeState(halted=True, halt_reason="test"), d, "d-chop2",
+                               vol_pct=Decimal("0.5"), chg_12h=Decimal("0.3"))
+    assert not any("chop backstop" in r for r in summary["gate"])

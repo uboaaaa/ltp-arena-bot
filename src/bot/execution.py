@@ -20,7 +20,16 @@ from bot.config import (
     REQUIRE_CONFIRMATION,
     SOFT_HALT_EQUITY,
     SYMBOL,
-    WRITE_SPACING
+    WRITE_SPACING,
+    VOL_SL_MULT,
+    VOL_TP_MULT,
+    STOP_COOLDOWN_SECONDS,
+    CHOP_THRESHOLD_PCT,
+    CHOP_CONF_FLOOR,
+    MIN_TP_PCT,
+    MAX_TP_PCT,
+    MIN_SL_PCT,
+    MAX_SL_PCT
 )
 
 from broker.rapidx import (
@@ -97,6 +106,10 @@ def gate_check(state, transition: str) -> list[str]:
         held = time.time() - state.last_entry_at
         if state.last_entry_at and held < MIN_HOLD_SECONDS:
             reasons.append(f"min hold: entered {held:.0f}s ago")
+        since_stop = time.time() - state.last_stop_at
+        if state.last_stop_at and since_stop < STOP_COOLDOWN_SECONDS:
+            reasons.append(f"stop cooldown: stopped out {since_stop:.0f}s ago")
+
     since_write = time.time() - state.last_write_at
     if state.last_write_at and since_write < WRITE_SPACING:
         reasons.append(f"write spacing: last write {since_write:.1f}s ago")
@@ -132,6 +145,30 @@ def check_bracket(state) -> tuple[str, Decimal] | None:
     
     return None
 
+def avg_hourly_range_pct(klines_response) -> Decimal | None:
+    """ Avg high-low span per candle, as a % of price """ 
+    candles = klines_response.get("candles", []) if isinstance(klines_response, dict) else klines_response
+    if not candles:
+        return None
+    ranges = [(Decimal(str(c[2])) - Decimal(str(c[3]))) / Decimal(str(c[4])) * 100 for c in candles]
+    return sum(ranges) / len(ranges)
+
+def change_12h_pct(klines_response) -> Decimal | None:
+    """ Signed close-to-close change within the fetched window """
+    candles = klines_response.get("candles", []) if isinstance(klines_response, dict) else klines_response
+    if len(candles) < 2:
+        return None
+    first, last = Decimal(str(candles[0][4])), Decimal(str(candles[-1][4]))
+    return ((last - first) / first) * 100
+
+def derive_brackets(vol_pct, model_tp: Decimal, model_sl: Decimal) -> tuple[Decimal, Decimal]:
+    """ Geomnetry from measured volatility. Model values only if no data """
+    if not vol_pct or vol_pct <= 0:
+        return model_tp, model_sl
+    tp = min(max(vol_pct * VOL_TP_MULT, MIN_TP_PCT), MAX_TP_PCT)
+    sl = min(max(vol_pct * VOL_SL_MULT, MIN_SL_PCT), MAX_SL_PCT)
+    return tp, sl
+
 # --- orchestration (run via to_thread)---
 def _wait_terminal(client_order_id: str, tries: int=10) -> dict:
     for _ in range(tries):
@@ -158,17 +195,17 @@ def _open(side, qty, price_cap, state, decision, decision_id) -> dict:
     result = _wait_terminal(order["clientOrderId"])
     if result.get("orderState") == "FILLED":
         state.last_entry_at = time.time()
-        state.active_plan = {
+        state.set_plan({
             "tp_pct" : decision["take_profit_pct"],
             "sl_pct" : decision["stop_loss_pct"],
             "decision_id" : decision_id,
             "opened_at" : time.time(),
-            "side" : "LONG" if side == "BUY" else "SHORT",
-        }
+            "side" : "LONG" if side=="BUY" else "SHORT",
+        })
     log.info("EXECUTE result: state=%s  filled=%s  avg=%s", result.get("orderState"), result.get("executedQty"), result.get("executedAvgPrice"))
     return result
 
-def execute_decision(state, decision: dict, decision_id) -> dict:
+def execute_decision(state, decision: dict, decision_id, vol_pct=None, chg_12h=None) -> dict:
     """ FULL PIPELINE: stance -> transition -> gate -> orders.
     Retuns summary dict for reasoning logs """
     summary = {"decision" : decision, "transition" : None, "gate" : [], "orders" : []}
@@ -180,6 +217,14 @@ def execute_decision(state, decision: dict, decision_id) -> dict:
     if transition in ("NONE", "HOLD"):
         return summary
     
+    if transition.startswith(("OPEN", "CLOSE_THEN")) and chg_12h is not None:
+        if abs(chg_12h) < CHOP_THRESHOLD_PCT and decision["confidence"] < CHOP_CONF_FLOOR:
+            reason = (f"chop backstop: |12h change| {abs(chg_12h):.2f}% < "
+                      f"{CHOP_THRESHOLD_PCT}% and conf {decision['confidence']:.2f} < {CHOP_CONF_FLOOR}")
+            summary['gate'] = [reason]
+            log.info("EXECUTE gated: %s", reason)
+            return summary
+
     proposed = decision["action"]
     if transition.startswith(("OPEN", "CLOSE_THEN")) and REQUIRE_CONFIRMATION:
         if state.pending_signal != proposed:
@@ -188,6 +233,7 @@ def execute_decision(state, decision: dict, decision_id) -> dict:
             summary["gate"] = [reason]
             log.info("EXECUTE debounced: %s", reason)
             return summary
+            
     state.pending_signal = proposed
     
     reasons = gate_check(state, transition)
@@ -209,8 +255,15 @@ def execute_decision(state, decision: dict, decision_id) -> dict:
             "type" : "close",
             "result" : close_position(SYMBOL, cap)
         })
+        state.set_plan(None)
         state.last_write_at = time.time()
         time.sleep(WRITE_SPACING)
+
+    eff_tp, eff_sl = derive_brackets(vol_pct, decision["take_profit_pct"], decision["stop_loss_pct"])
+    if (eff_tp, eff_sl) != (decision["take_profit_pct"], decision["stop_loss_pct"]):
+        log.info("EXECUTE brackets: model %s/%s -> volatility-derived %s/%s", decision["take_profit_pct"], decision["stop_loss_pct"], eff_tp, eff_sl)
+    decision = {**decision, "take_profit_pct" : eff_tp, "stop_loss_pct" : eff_sl}
+    summary["effective_brackets"] = {"tp" : str(eff_tp), "sl" : str(eff_sl)} 
     
     if transition in ("OPEN_LONG", "CLOSE_THEN_LONG", "OPEN_SHORT", "CLOSE_THEN_SHORT"):
         qty = size_order(state.equity, decision["confidence"], last, lot, min_notional)

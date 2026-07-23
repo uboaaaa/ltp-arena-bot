@@ -30,6 +30,7 @@ MAX_SL_PCT = Decimal("1.5")
 DEFAULT_TP_PCT = Decimal("0.6")
 DEFAULT_SL_PCT = Decimal("0.4")
 MAX_POSITION_AGE_SECONDS = 4 * 3600
+BRACKET_COOLDOWN_SECONDS = 30
 REQUIRE_CONFIRMATION = False
 
 # --- execution ---
@@ -39,3 +40,10 @@ CONF_FULL = 0.8
 MIN_HOLD_SECONDS = 900
 MAX_EQUITY_AGE = 30
 WRITE_SPACING = 6
+
+# --- volatility-derived bracket params ---
+VOL_SL_MULT = Decimal("1.3") # stop sits outside one hour of typical noise
+VOL_TP_MULT = Decimal("0.8")
+STOP_COOLDOWN_SECONDS = 2700
+CHOP_THRESHOLD_PCT = Decimal("0.8") # within 12 hrs, changes below this value indicate rangebound market
+CHOP_CONF_FLOOR = 0.7 # minimum confidence to open a position during a chop

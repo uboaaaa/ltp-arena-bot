@@ -14,7 +14,7 @@ from ai.prompt import build_prompt
 # bot imports
 from bot.config import (
     EXECUTION_ENABLED,
-    SOFT_HALT_EQUITY,
+    BRACKET_COOLDOWN_SECONDS,
     HARD_FLATTEN_EQUITY,
     HEARTBEAT_INTERVAL,
     RISK_INTERVAL,
@@ -24,7 +24,9 @@ from bot.config import (
 from bot.state import BotState
 from bot.execution import (
     execute_decision,
-    check_bracket
+    check_bracket,
+    avg_hourly_range_pct,
+    change_12h_pct,
 )
 from bot import journal
 
@@ -67,7 +69,13 @@ async def startup_reconciliation(state: BotState) -> None:
         positions = await asyncio.to_thread(get_open_positions)
         state.update_positions(positions)
         if positions:
-            log.warning("startup: ADOPTING %d existing open position(s): %s", len(positions), json.dumps(positions))
+            state.load_plan()
+            if state.active_plan:
+                log.info("startup: restored bracket plan: %s", state.active_plan)
+            else:
+                log.warning("startup: open position with NO saved plan. using default brackets")
+        else:
+            state.set_plan(None)
         log.info("startup complete: %s", state.summary())
 
     except Exception:
@@ -81,25 +89,32 @@ async def risk_monitor(state: BotState) -> None:
             positions = await asyncio.to_thread(get_open_positions)
             state.update_positions(positions)
 
-            trigger = check_bracket(state)
+            trigger = None
+            if time.time() - state.last_bracket_close_at > BRACKET_COOLDOWN_SECONDS:
+                trigger = check_bracket(state)
             if trigger:
                 reason, pnl_pct = trigger
-                log.info("BRACKET %s at %+.3f%%", reason, pnl_pct)
+                log.info("BRACKET %s at %+.3f%", reason, pnl_pct)
                 if EXECUTION_ENABLED:
-                    result = await asyncio.to_thread(
-                        close_position,
-                        SYMBOL,
-                        str(state.equity or 1000)
-                    )
-                    journal.record({
-                        "event" : "bracket_exit",
-                        "trigger" : reason,
-                        "pnl_pct" : str(pnl_pct),
-                        "decision_id" : (state.active_plan or {}).get("decision_id"),
-                        "plan" : {k: str(v) for k, v in (state.active_plan or {}).items()},
-                        "result" : result,
-                    })
-                    state.active_plan = None 
+                    try:
+                        result = await asyncio.to_thread(close_position, SYMBOL, str(state.equity or 1000))
+                        journal.record({
+                            "event" : "bracket_exit",
+                            "trigger" : reason,
+                            "pnl_pct" : str(pnl_pct),
+                            "deicison_id" : (state.active_plan or {}).get("decision_id"),
+                            "plan" : {k : str(v) for k, v in (state.active_plan or {}).items()},
+                            "result" : result,
+                        })  
+                        state.set_plan = None
+                        state.last_bracket_close_at = time.time()
+                        state.last_write_at = time.time()
+                        if reason == "stop_loss":
+                            state.last_stop_at = time.time()
+                            
+                    except Exception:
+                        log.critical("BRACKET CLOSE FAILED (%s at %+.3f%); POSITION UNPROTECTED! Retrying next cycle", reason, pnl_pct, exc_info=True)
+        
 
             if equity < HARD_FLATTEN_EQUITY and not state.halted:
                 state.halted = True
@@ -127,6 +142,8 @@ async def strategy_loop(state: BotState) -> None:
             else:
                 ticker = await asyncio.to_thread(get_ticker, SYMBOL)
                 klines = await asyncio.to_thread(get_klines, SYMBOL)
+                vol_pct = avg_hourly_range_pct(klines)
+                chg_12h = change_12h_pct(klines)
                 funding = await asyncio.to_thread(get_funding_rate, SYMBOL)
 
                 try:
@@ -157,7 +174,7 @@ async def strategy_loop(state: BotState) -> None:
                     state.update_decision(decision)
                     log.info("strategy: decision=%s   conf=%f   reason=%s", decision['action'], decision['confidence'], decision['reasoning'])
                     if EXECUTION_ENABLED:
-                        result = await asyncio.to_thread(execute_decision, state, decision, decision_id)
+                        result = await asyncio.to_thread(execute_decision, state, decision, decision_id, vol_pct, chg_12h)
                         entry["execution"] = result
                         log.info("execution summary: %s", json.dumps(result, default=str))
                     else:
