@@ -7,6 +7,13 @@ from decimal import Decimal
 PLAN_PATH = os.path.join("data", "active_plan.json")
 
 class BotState:
+    __slots__ = (
+    "equity", "equity_updated_at", "open_positions", "positions_updated_at",
+    "last_decision", "last_decision_at", "last_entry_at", "last_write_at",
+    "last_bracket_close_at", "last_stop_at", "halted", "halt_reason",
+    "pending_signal", "active_plan",
+    )
+    
     def __init__(self):
         self.equity: Decimal | None = None
         self.equity_updated_at: float = 0.0

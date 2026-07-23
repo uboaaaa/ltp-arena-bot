@@ -1,5 +1,6 @@
 """ Prompt construction for trading decisions. """
 
+import time
 from decimal import Decimal
 
 PROMPT_HEADER = """You are the decision engine of an automated crypto trading bot in a \
@@ -74,5 +75,31 @@ def build_prompt(ticker: dict, klines_response, funding_rows, headlines, state) 
         news = "\n".join(f" - {h}" for h in headlines[:5])
         evidence.append(f"- recent headlines:\n{news}")
 
-    evidence.append(f"- our stance: {'holding a position' if state.open_positions else 'flat'}")
+    evidence.append(f"- our stance: {describe_stance(state)}")
     return f"{PROMPT_HEADER}\nCurrent evidence for BTC perpetual:\n" + "\n".join(evidence)
+
+def describe_stance(state) -> str:
+    """ One-liner explaining the position we're holding to the model so it doesn't have to guess. Positive PnL means trade is winning for longs and shorts alike """
+    try:
+        row = next((r for r in state.open_positions if Decimal(str(r.get("positionQty", "0"))) != 0), None)
+        if row is None:
+            return "flat"
+        
+        qty = Decimal(str(row["positionQty"]))
+        side = "LONG" if qty > 0 else "SHORT"
+        line = f"holding a {side}"
+        avg = Decimal(str(row.get("avgPrice", "0")))
+        mark = Decimal(str(row.get("markPrice", "0")))
+        if avg > 0 and mark > 0:
+            direction = Decimal("1") if qty > 0 else Decimal("-1")
+            pnl_pct = ((mark - avg) / avg) * Decimal("100") * direction
+            line += f" opened at {avg}, currently {pnl_pct:+.2f}%"
+        plan = state.active_plan or {}
+        opened_at = float(plan.get("opened_at") or 0)
+        if opened_at:
+            line += f", held for {(time.time() - opened_at) / 60:.0f} minutes"
+        return line
+    
+    except Exception:
+        return "holding a position" if state.open_positions else "flat"
+    
