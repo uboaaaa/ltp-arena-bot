@@ -106,7 +106,7 @@ async def risk_monitor(state: BotState) -> None:
                             "plan" : {k : str(v) for k, v in (state.active_plan or {}).items()},
                             "result" : result,
                         })  
-                        state.set_plan = None
+                        state.set_plan(None)
                         state.last_bracket_close_at = time.time()
                         state.last_write_at = time.time()
                         if reason == "stop_loss":

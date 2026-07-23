@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "baseUrl": "https://api.ltp-contest.com",
-  "fetchedAt": "2026-07-21T23:23:38.908Z",
-  "freshUntil": "2026-07-22T23:23:38.908Z",
-  "staleUntil": "2026-07-28T23:23:38.908Z",
+  "fetchedAt": "2026-07-23T03:44:52.857Z",
+  "freshUntil": "2026-07-24T03:44:52.857Z",
+  "staleUntil": "2026-07-30T03:44:52.857Z",
   "rulesBySymbol": {
     "BINANCE_SPOT_ENS_USDT": {
       "symbol": "BINANCE_SPOT_ENS_USDT",
@@ -179,7 +179,7 @@
     "OKX_SPOT_DOT_USDT": {
       "symbol": "OKX_SPOT_DOT_USDT",
       "minNotional": "0",
-      "minSize": "0.1",
+      "minSize": "1",
       "lotSize": "0.000001",
       "qtyPrecision": "6",
       "tickSize": "0.0001",
@@ -947,8 +947,8 @@
       "minSize": "0.10000000",
       "lotSize": "0.1",
       "qtyPrecision": "1",
-      "tickSize": "0.0001",
-      "pricePrecision": "4"
+      "tickSize": "0.00001",
+      "pricePrecision": "5"
     },
     "BINANCE_PERP_PUNDIX_USDT": {
       "symbol": "BINANCE_PERP_PUNDIX_USDT",
@@ -974,8 +974,8 @@
       "minSize": "1",
       "lotSize": "1",
       "qtyPrecision": "0",
-      "tickSize": "0.0000100",
-      "pricePrecision": "5"
+      "tickSize": "0.0000010",
+      "pricePrecision": "6"
     },
     "BINANCE_PERP_DYM_USDT": {
       "symbol": "BINANCE_PERP_DYM_USDT",
@@ -1415,8 +1415,8 @@
       "minSize": "0.10000000",
       "lotSize": "0.1",
       "qtyPrecision": "1",
-      "tickSize": "0.001",
-      "pricePrecision": "3"
+      "tickSize": "0.0001",
+      "pricePrecision": "4"
     },
     "BINANCE_SPOT_STG_USDT": {
       "symbol": "BINANCE_SPOT_STG_USDT",
@@ -3206,8 +3206,8 @@
       "minSize": "0.10000000",
       "lotSize": "0.1",
       "qtyPrecision": "1",
-      "tickSize": "0.001",
-      "pricePrecision": "3"
+      "tickSize": "0.00001",
+      "pricePrecision": "5"
     },
     "BINANCE_PERP_XAN_USDT": {
       "symbol": "BINANCE_PERP_XAN_USDT",
@@ -3521,8 +3521,8 @@
       "minSize": "0.10000000",
       "lotSize": "0.1",
       "qtyPrecision": "1",
-      "tickSize": "0.0001",
-      "pricePrecision": "4"
+      "tickSize": "0.00001",
+      "pricePrecision": "5"
     },
     "BINANCE_SPOT_DODO_USDT": {
       "symbol": "BINANCE_SPOT_DODO_USDT",
@@ -3863,8 +3863,8 @@
       "minSize": "0.01000000",
       "lotSize": "0.01",
       "qtyPrecision": "2",
-      "tickSize": "0.01",
-      "pricePrecision": "2"
+      "tickSize": "0.001",
+      "pricePrecision": "3"
     },
     "OKX_PERP_SEI_USDT": {
       "symbol": "OKX_PERP_SEI_USDT",
@@ -4286,8 +4286,8 @@
       "minSize": "1",
       "lotSize": "1",
       "qtyPrecision": "0",
-      "tickSize": "0.0001000",
-      "pricePrecision": "4"
+      "tickSize": "0.0000100",
+      "pricePrecision": "5"
     },
     "BINANCE_PERP_XVS_USDT": {
       "symbol": "BINANCE_PERP_XVS_USDT",
@@ -5951,8 +5951,8 @@
       "minSize": "0.10000000",
       "lotSize": "0.1",
       "qtyPrecision": "1",
-      "tickSize": "0.0001",
-      "pricePrecision": "4"
+      "tickSize": "0.000001",
+      "pricePrecision": "6"
     },
     "BINANCE_PERP_EUL_USDT": {
       "symbol": "BINANCE_PERP_EUL_USDT",
@@ -6464,8 +6464,8 @@
       "minSize": "0.01000000",
       "lotSize": "0.01",
       "qtyPrecision": "2",
-      "tickSize": "0.001",
-      "pricePrecision": "3"
+      "tickSize": "0.0001",
+      "pricePrecision": "4"
     },
     "BINANCE_PERP_ZORA_USDT": {
       "symbol": "BINANCE_PERP_ZORA_USDT",
@@ -7670,8 +7670,8 @@
       "minSize": "0.01000000",
       "lotSize": "0.01",
       "qtyPrecision": "2",
-      "tickSize": "0.0001",
-      "pricePrecision": "4"
+      "tickSize": "0.00001",
+      "pricePrecision": "5"
     },
     "BINANCE_PERP_PENDLE_USDT": {
       "symbol": "BINANCE_PERP_PENDLE_USDT",
@@ -7850,8 +7850,8 @@
       "minSize": "0.10000000",
       "lotSize": "0.1",
       "qtyPrecision": "1",
-      "tickSize": "0.0001",
-      "pricePrecision": "4"
+      "tickSize": "0.000001",
+      "pricePrecision": "6"
     },
     "BINANCE_PERP_ARIA_USDT": {
       "symbol": "BINANCE_PERP_ARIA_USDT",
@@ -8777,8 +8777,8 @@
       "minSize": "0.10000000",
       "lotSize": "0.1",
       "qtyPrecision": "1",
-      "tickSize": "0.00001",
-      "pricePrecision": "5"
+      "tickSize": "0.000001",
+      "pricePrecision": "6"
     },
     "OKX_PERP_KGEN_USDT": {
       "symbol": "OKX_PERP_KGEN_USDT",
@@ -9353,8 +9353,8 @@
       "minSize": "0.10000000",
       "lotSize": "0.1",
       "qtyPrecision": "1",
-      "tickSize": "0.001",
-      "pricePrecision": "3"
+      "tickSize": "0.0001",
+      "pricePrecision": "4"
     },
     "BINANCE_PERP_BAS_USDT": {
       "symbol": "BINANCE_PERP_BAS_USDT",
@@ -9443,8 +9443,8 @@
       "minSize": "0.01",
       "lotSize": "0.01",
       "qtyPrecision": "2",
-      "tickSize": "0.010000",
-      "pricePrecision": "2"
+      "tickSize": "0.001000",
+      "pricePrecision": "3"
     },
     "BINANCE_SPOT_ATOM_USDT": {
       "symbol": "BINANCE_SPOT_ATOM_USDT",
