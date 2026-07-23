@@ -56,7 +56,7 @@ def parse_llm_decision(raw: str) -> str | None:
     
     if action != "FLAT":
         try:
-            tp = Decimal(str(decision["trake_profit_pct"]))
+            tp = Decimal(str(decision["take_profit_pct"]))
         except (KeyError, TypeError, InvalidOperation):
             tp = DEFAULT_TP_PCT
         try:

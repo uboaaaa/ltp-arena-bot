@@ -94,7 +94,7 @@ async def risk_monitor(state: BotState) -> None:
                 trigger = check_bracket(state)
             if trigger:
                 reason, pnl_pct = trigger
-                log.info("BRACKET %s at %+.3f%", reason, pnl_pct)
+                log.info("BRACKET %s at %+.3f%%", reason, pnl_pct)
                 if EXECUTION_ENABLED:
                     try:
                         result = await asyncio.to_thread(close_position, SYMBOL, str(state.equity or 1000))
@@ -102,7 +102,7 @@ async def risk_monitor(state: BotState) -> None:
                             "event" : "bracket_exit",
                             "trigger" : reason,
                             "pnl_pct" : str(pnl_pct),
-                            "deicison_id" : (state.active_plan or {}).get("decision_id"),
+                            "decision_id" : (state.active_plan or {}).get("decision_id"),
                             "plan" : {k : str(v) for k, v in (state.active_plan or {}).items()},
                             "result" : result,
                         })  
@@ -113,7 +113,7 @@ async def risk_monitor(state: BotState) -> None:
                             state.last_stop_at = time.time()
                             
                     except Exception:
-                        log.critical("BRACKET CLOSE FAILED (%s at %+.3f%); POSITION UNPROTECTED! Retrying next cycle", reason, pnl_pct, exc_info=True)
+                        log.critical("BRACKET CLOSE FAILED (%s at %+.3f%%); POSITION UNPROTECTED! Retrying next cycle", reason, pnl_pct, exc_info=True)
         
 
             if equity < HARD_FLATTEN_EQUITY and not state.halted:

@@ -18,3 +18,7 @@ data/
 
 # RapidX
 .rapidx/
+
+
+# Backups
+src/bot/main.py.bak
