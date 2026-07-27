@@ -59,7 +59,7 @@ def test_full_open_path_long(tmp_path, monkeypatch):
     # volatility-derived brackets overrode the model's 0.6/0.4
     eb = summary["effective_brackets"]
     assert Decimal(eb["tp"]) == Decimal("0.4")             # 0.5 * 0.8
-    assert Decimal(eb["sl"]) == Decimal("0.65")            # 0.5 * 1.3
+    assert Decimal(eb["sl"]) == Decimal("0.35")            # 0.5 * 0.7
     # plan persisted with the EFFECTIVE brackets and decision id
     assert state.active_plan["decision_id"] == "d-dry-1"
     assert state.active_plan["tp_pct"] == Decimal("0.4")
