@@ -81,6 +81,7 @@ def load_events(path):
                 "chg12h": chg12h,
                 "range": rng,
                 "reasoning": dec.get("reasoning") or "",
+                "catalyst_model": dec.get("catalyst"),
             })
     return opens, exits
 
@@ -110,6 +111,16 @@ def catalyst_guess(reasoning):
     if any(kw in text for kw in NO_CATALYST_HINTS):
         return False
     return any(kw in text for kw in CATALYST_HINTS)
+
+
+def catalyst_label(trade):
+    """Prefer the model's own tag (records after 2026-07-23); keyword-guess older ones."""
+    tag = trade.get("catalyst_model")
+    if tag is True:
+        return "yes"
+    if tag is False:
+        return "no"
+    return "~yes(guess)" if catalyst_guess(trade["reasoning"]) else "~no(guess)"
 
 
 def match_trades(opens, exits):
@@ -146,7 +157,7 @@ def print_trades(trades):
         print(f"{t['ts'][:16]:<17} {t['action']:<6} {t['confidence']:<5} "
               f"{classify(t):<18} {rp if rp is None else round(rp):<5} "
               f"{t['trigger']:<12} {held:<6} {t['pnl_net_pct']:+.3f}  "
-              f"{'~yes' if catalyst_guess(t['reasoning']) else '~no ':<9} "
+              f"{catalyst_label(t):<11} "
               f"{t['reasoning'][:70]}")
 
 
@@ -177,8 +188,8 @@ def main():
           f"{len(trades)} matched round trips\n")
     print_trades(trades)
     print_summary(trades, "by price context", classify)
-    print_summary(trades, "by catalyst guess (verify by eye!)",
-                  lambda t: "catalyst~yes" if catalyst_guess(t["reasoning"]) else "catalyst~no")
+    print_summary(trades, "by catalyst (model tag when available, ~guess for old records)",
+                  lambda t: "catalyst-" + catalyst_label(t))
 
     if unmatched_opens:
         print("\n--- opens with no recorded exit (last one may still be held) ---")
