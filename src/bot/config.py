@@ -54,5 +54,5 @@ EXIT_VOTE_CALLS = 2
 EXIT_VOTES_NEEDED = 2
 
 # --- edge zone experiments (see experiment doc)
-EDGE_ZONE_ENABLED = False
+EDGE_ZONE_ENABLED = True
 EDGE_ZONE_PCT = Decimal("20") # outer band width, as percent of day's range

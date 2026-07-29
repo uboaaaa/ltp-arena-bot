@@ -251,6 +251,7 @@ def test_edge_zone_allows_fade_short_at_range_top(tmp_path, monkeypatch):
 def test_edge_zone_flag_off_still_gates(tmp_path, monkeypatch):
     state = _mk_state(tmp_path, monkeypatch)
     calls = _mock_broker(monkeypatch, "SELL")
+    monkeypatch.setattr(ex, "EDGE_ZONE_ENABLED", False)
     summary = ex.execute_decision(state, dict(DECISION_FADE_SHORT), "d-ez-2",
                                   vol_pct=Decimal("0.5"), chg_12h=Decimal("0.3"),
                                   range_pos=Decimal("85"))
