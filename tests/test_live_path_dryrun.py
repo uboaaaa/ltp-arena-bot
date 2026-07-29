@@ -213,3 +213,77 @@ def test_model_exit_close_failure_preserves_state(tmp_path, monkeypatch):
         ex.handle_model_exit(state, [{"action": "FLAT", "confidence": 0.7}])
     assert records == []
     assert state.active_plan is not None
+
+
+# edge-zone tests
+def test_edge_zone_fade_boundaries():
+    assert ex.is_edge_zone_fade("LONG", Decimal("20"))
+    assert not ex.is_edge_zone_fade("LONG", Decimal("21"))
+    assert ex.is_edge_zone_fade("SHORT", Decimal("80"))
+    assert not ex.is_edge_zone_fade("SHORT", Decimal("79"))
+    assert not ex.is_edge_zone_fade("LONG", Decimal("85"))    # chasing the high
+    assert not ex.is_edge_zone_fade("SHORT", Decimal("15"))   # chasing the low
+    assert not ex.is_edge_zone_fade("FLAT", Decimal("10"))
+    assert not ex.is_edge_zone_fade("LONG", None)
+
+def test_range_position_normal_and_degenerate():
+    t = {"lastPrice": "64500", "lowPrice": "64000", "highPrice": "65000"}
+    assert ex.ticker_range_position_pct(t) == Decimal("50")
+    flat_day = {"lastPrice": "64000", "lowPrice": "64000", "highPrice": "64000"}
+    assert ex.ticker_range_position_pct(flat_day) is None
+    assert ex.ticker_range_position_pct({}) is None
+
+DECISION_FADE_SHORT = {"action": "SHORT", "confidence": 0.65, "reasoning": "fade test",
+                       "take_profit_pct": Decimal("0.6"), "stop_loss_pct": Decimal("0.4")}
+
+def test_edge_zone_allows_fade_short_at_range_top(tmp_path, monkeypatch):
+    state = _mk_state(tmp_path, monkeypatch)
+    calls = _mock_broker(monkeypatch, "SELL")
+    monkeypatch.setattr(ex, "EDGE_ZONE_ENABLED", True)
+    summary = ex.execute_decision(state, dict(DECISION_FADE_SHORT), "d-ez-1",
+                                  vol_pct=Decimal("0.5"), chg_12h=Decimal("0.3"),
+                                  range_pos=Decimal("85"))
+    assert len(calls["placed"]) == 1          # the trade actually happens
+    assert calls["placed"][0]["side"] == "SELL"
+    assert summary["edge_zone"] == "85"       # and carries its category stamp
+    assert summary["gate"] == []
+
+def test_edge_zone_flag_off_still_gates(tmp_path, monkeypatch):
+    state = _mk_state(tmp_path, monkeypatch)
+    calls = _mock_broker(monkeypatch, "SELL")
+    summary = ex.execute_decision(state, dict(DECISION_FADE_SHORT), "d-ez-2",
+                                  vol_pct=Decimal("0.5"), chg_12h=Decimal("0.3"),
+                                  range_pos=Decimal("85"))
+    assert calls["placed"] == []
+    assert any("chop backstop" in g for g in summary["gate"])
+
+def test_edge_zone_requires_conf_floor(tmp_path, monkeypatch):
+    state = _mk_state(tmp_path, monkeypatch)
+    calls = _mock_broker(monkeypatch, "SELL")
+    monkeypatch.setattr(ex, "EDGE_ZONE_ENABLED", True)
+    weak = dict(DECISION_FADE_SHORT, confidence=0.55)
+    summary = ex.execute_decision(state, weak, "d-ez-3",
+                                  vol_pct=Decimal("0.5"), chg_12h=Decimal("0.3"),
+                                  range_pos=Decimal("85"))
+    assert calls["placed"] == []
+    assert any("chop backstop" in g for g in summary["gate"])
+
+def test_edge_zone_mid_range_still_gated(tmp_path, monkeypatch):
+    state = _mk_state(tmp_path, monkeypatch)
+    calls = _mock_broker(monkeypatch, "SELL")
+    monkeypatch.setattr(ex, "EDGE_ZONE_ENABLED", True)
+    ex.execute_decision(state, dict(DECISION_FADE_SHORT), "d-ez-4",
+                                  vol_pct=Decimal("0.5"), chg_12h=Decimal("0.3"),
+                                  range_pos=Decimal("50"))
+    assert calls["placed"] == []
+
+def test_edge_zone_chase_still_gated(tmp_path, monkeypatch):
+    state = _mk_state(tmp_path, monkeypatch)
+    calls = _mock_broker(monkeypatch, "BUY")
+    monkeypatch.setattr(ex, "EDGE_ZONE_ENABLED", True)
+    chase = {"action": "LONG", "confidence": 0.65, "reasoning": "chase test",
+             "take_profit_pct": Decimal("0.6"), "stop_loss_pct": Decimal("0.4")}
+    ex.execute_decision(state, chase, "d-ez-5",
+                                  vol_pct=Decimal("0.5"), chg_12h=Decimal("0.3"),
+                                  range_pos=Decimal("85"))    # buying at the top
+    assert calls["placed"] == []

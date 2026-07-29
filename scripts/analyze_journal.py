@@ -82,6 +82,7 @@ def load_events(path):
                 "range": rng,
                 "reasoning": dec.get("reasoning") or "",
                 "catalyst_model": dec.get("catalyst"),
+                "edge_zone" : bool(ex.get("edge_zone")),
             })
     return opens, exits
 
@@ -98,6 +99,8 @@ def range_position_pct(trade):
 
 def classify(trade):
     chg = trade["chg12h"]
+    if trade.get("edge_zone"):
+        return "edge-zone-fade"
     if chg is None or trade["action"] not in ("LONG", "SHORT"):
         return "unclassified"
     if abs(chg) < CHOP_THRESHOLD_PCT:

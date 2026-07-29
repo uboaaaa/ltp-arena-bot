@@ -33,7 +33,8 @@ from bot.execution import (
     current_stance,
     should_call_exit_vote,
     count_exit_votes,
-    handle_model_exit
+    handle_model_exit,
+    ticker_range_position_pct
 )
 from bot import journal
 
@@ -134,6 +135,7 @@ async def strategy_loop(state: BotState) -> None:
             else:
                 ticker = await asyncio.to_thread(get_ticker, SYMBOL)
                 klines = await asyncio.to_thread(get_klines, SYMBOL)
+                range_pos = ticker_range_position_pct(ticker)
                 vol_pct = avg_hourly_range_pct(klines)
                 chg_12h = change_12h_pct(klines)
                 funding = await asyncio.to_thread(get_funding_rate, SYMBOL)
@@ -181,7 +183,7 @@ async def strategy_loop(state: BotState) -> None:
                             entry["execution"] = {"transition" : "VOTE_HOLD", "votes_for_exit" : tally}
 
                     elif EXECUTION_ENABLED:
-                        result = await asyncio.to_thread(execute_decision, state, decision, decision_id, vol_pct, chg_12h)
+                        result = await asyncio.to_thread(execute_decision, state, decision, decision_id, vol_pct, chg_12h, range_pos)
                         entry["execution"] = result
                         log.info("execution summary: %s", json.dumps(result, default=str))
                     else:

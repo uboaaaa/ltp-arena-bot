@@ -32,7 +32,9 @@ from bot.config import (
     MAX_TP_PCT,
     MIN_SL_PCT,
     MAX_SL_PCT,
-    EXIT_CONF
+    EXIT_CONF,
+    EDGE_ZONE_ENABLED,
+    EDGE_ZONE_PCT
 )
 
 from broker.rapidx import (
@@ -243,6 +245,28 @@ def count_exit_votes(stance: str, decisions: list) -> int:
     """ How many collected opinions vote to be out of this position """
     return sum(1 for d in decisions if d and d.get("action") != stance)
 
+def ticker_range_position_pct(ticker: dict) -> Decimal | None:
+    """ Where the last price sits in relation to the day's range. 0 means it's at the low end, 100 means it's at the high end """
+    try:
+        last = Decimal(str(ticker["lastPrice"]))
+        lo = Decimal(str(ticker["lowPrice"]))
+        hi = Decimal(str(ticker["highPrice"]))
+    except (KeyError, TypeError, ArithmeticError):
+        return None
+    if hi <= lo:
+        return None
+    return (last - lo) / (hi - lo) * Decimal("100")
+
+def is_edge_zone_fade(action: str, range_pos) -> bool:
+    """ True only for fades back toward the middle from the outer band. LONG near the low, SHORT near the high. We don't chase the edge. """
+    if range_pos is None:
+        return False
+    if action == "LONG":
+        return range_pos <= EDGE_ZONE_PCT
+    if action == "SHORT":
+        return range_pos >= Decimal("100") - EDGE_ZONE_PCT
+    return False
+
 # --- orchestration (run via to_thread)---
 def _wait_terminal(client_order_id: str, tries: int=10) -> dict:
     for _ in range(tries):
@@ -279,7 +303,7 @@ def _open(side, qty, price_cap, state, decision, decision_id) -> dict:
     log.info("EXECUTE result: state=%s  filled=%s  avg=%s", result.get("orderState"), result.get("executedQty"), result.get("executedAvgPrice"))
     return result
 
-def execute_decision(state, decision: dict, decision_id, vol_pct=None, chg_12h=None) -> dict:
+def execute_decision(state, decision: dict, decision_id, vol_pct=None, chg_12h=None, range_pos=None) -> dict:
     """ FULL PIPELINE: stance -> transition -> gate -> orders.
     Retuns summary dict for reasoning logs """
     summary = {"decision" : decision, "transition" : None, "gate" : [], "orders" : []}
@@ -293,11 +317,15 @@ def execute_decision(state, decision: dict, decision_id, vol_pct=None, chg_12h=N
     
     if transition.startswith(("OPEN", "CLOSE_THEN")) and chg_12h is not None:
         if abs(chg_12h) < CHOP_THRESHOLD_PCT and decision["confidence"] < CHOP_CONF_FLOOR:
-            reason = (f"chop backstop: |12h change| {abs(chg_12h):.2f}% < "
-                      f"{CHOP_THRESHOLD_PCT}% and conf {decision['confidence']:.2f} < {CHOP_CONF_FLOOR}")
-            summary['gate'] = [reason]
-            log.info("EXECUTE gated: %s", reason)
-            return summary
+            if (EDGE_ZONE_ENABLED and range_pos is not None and decision["confidence"] >= CONF_FLOOR and is_edge_zone_fade(decision["action"], range_pos)):
+                summary["edge_zone"] = str(range_pos)
+                log.info("EXECUTE edge-zone exception: %s at %.0f pct of range, conf %.2f", decision["action"], range_pos, decision["confidence"])
+            else:
+                reason = (f"chop backstop: |12h change| {abs(chg_12h):.2f}% < "
+                        f"{CHOP_THRESHOLD_PCT}% and conf {decision['confidence']:.2f} < {CHOP_CONF_FLOOR}")
+                summary['gate'] = [reason]
+                log.info("EXECUTE gated: %s", reason)
+                return summary
 
     proposed = decision["action"]
     if transition.startswith(("OPEN", "CLOSE_THEN")) and REQUIRE_CONFIRMATION:

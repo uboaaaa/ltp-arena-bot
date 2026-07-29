@@ -48,7 +48,11 @@ STOP_COOLDOWN_SECONDS = 2700
 CHOP_THRESHOLD_PCT = Decimal("0.8") # within 12 hrs, changes below this value indicate rangebound market
 CHOP_CONF_FLOOR = 0.7 # minimum confidence to open a position during a chop
 
-# --- bot exit confidence
+# --- bot exit confidence ---
 EXIT_CONF = 0.65
 EXIT_VOTE_CALLS = 2
 EXIT_VOTES_NEEDED = 2
+
+# --- edge zone experiments (see experiment doc)
+EDGE_ZONE_ENABLED = False
+EDGE_ZONE_PCT = Decimal("20") # outer band width, as percent of day's range
