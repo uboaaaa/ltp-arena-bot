@@ -8,6 +8,8 @@ import logging
 import time
 from decimal import Decimal
 
+from bot import journal
+
 from bot.config import (
     BASE_POSITION_FRACTION,
     CONF_FLOOR,
@@ -29,7 +31,8 @@ from bot.config import (
     MIN_TP_PCT,
     MAX_TP_PCT,
     MIN_SL_PCT,
-    MAX_SL_PCT
+    MAX_SL_PCT,
+    EXIT_CONF
 )
 
 from broker.rapidx import (
@@ -145,6 +148,56 @@ def check_bracket(state) -> tuple[str, Decimal] | None:
     
     return None
 
+def handle_bracket_exit(state, trigger) -> dict:
+    """ Close position for a fired bracket, journal it, then update cooldowns. Money first, record second, bookkeeping last. If the close raises, state is untouched and the next risk cycle retries """
+    reason, pnl_pct = trigger
+    result = close_position(SYMBOL, str(state.equity or 1000))
+    record = {
+        "event" : "bracket_exit",
+        "trigger" : reason,
+        "pnl_pct" : str(pnl_pct),
+        "decision_id" : (state.active_plan or {}).get("decision_id"),
+        "plan" : {k : str(v) for k, v in (state.active_plan or {}).items()},
+        "result" : result,
+    }
+    journal.record(record)
+    state.set_plan(None)
+    now = time.time()
+    state.last_bracket_close_at = now
+    state.last_write_at = now
+    if reason == "stop_loss":
+        state.last_stop_at = now
+    return record
+
+def handle_model_exit(state, votes: list) -> dict:
+    """ Close the position because a majority of sampled model opinions voted to be out. Similar to handle_bracket_exit. Voluntary exits do not kick off the stop cooldown """
+    pnl_pct = None
+    rows = [r for r in state.open_positions if r.get("sym") == SYMBOL]
+    if rows:
+        qty = Decimal(str(rows[0].get("positionQty", "0")))
+        avg = Decimal(str(rows[0].get("avgPrice", "0")))
+        mark = Decimal(str(rows[0].get("markPrice", "0")))
+        if qty != 0 and avg > 0 and mark > 0:
+            direction = Decimal("1") if qty > 0 else Decimal("-1")
+            pnl_pct = (mark - avg) / avg * Decimal("100") * direction
+    
+    result = close_position(SYMBOL, str(state.equity or 1000))
+    record = {
+        "event" : "model_exit",
+        "trigger" : "model_vote",
+        "pnl_pct" : str(pnl_pct) if pnl_pct is not None else None,
+        "decision_id" : (state.active_plan or {}).get("decision_id"),
+        "plan" : {k : str(v) for k, v in (state.active_plan or {}).items()},
+        "votes" : [{"action" : v.get("action"), "confidence" : v.get("confidence"), "reasoning" : v.get("reasoning")} for v in votes],
+        "result" : result,
+    }
+    journal.record(record)
+    state.set_plan(None)
+    now = time.time()
+    state.last_bracket_close_at = now
+    state.last_write_at = now
+    return record
+
 def avg_hourly_range_pct(klines_response) -> Decimal | None:
     """ Avg high-low span per candle, as a % of price """ 
     candles = klines_response.get("candles", []) if isinstance(klines_response, dict) else klines_response
@@ -168,6 +221,27 @@ def derive_brackets(vol_pct, model_tp: Decimal, model_sl: Decimal) -> tuple[Deci
     tp = min(max(vol_pct * VOL_TP_MULT, MIN_TP_PCT), MAX_TP_PCT)
     sl = min(max(vol_pct * VOL_SL_MULT, MIN_SL_PCT), MAX_SL_PCT)
     return tp, sl
+
+def wants_exit(stance: str, decision: dict | None) -> bool:
+    """ Returns true when model's decision disagrees with our current held position """
+    if stance not in ("LONG", "SHORT") or not decision:
+        return False
+    return decision.get("action") != stance
+
+def should_call_exit_vote(stance: str, decision: dict | None) -> bool:
+    """ Trigger a confirmation vote for moderate-confidence disagreement ONLY. Strong directional reversals (conf >= CONF_FULL) keep their existing path """
+    if not wants_exit(stance, decision):
+        return False
+    conf = float(decision.get("confidence") or 0)
+    if conf < EXIT_CONF:
+        return False
+    if decision.get("action") in ("LONG", "SHORT") and conf >= CONF_FULL:
+        return False
+    return True
+
+def count_exit_votes(stance: str, decisions: list) -> int:
+    """ How many collected opinions vote to be out of this position """
+    return sum(1 for d in decisions if d and d.get("action") != stance)
 
 # --- orchestration (run via to_thread)---
 def _wait_terminal(client_order_id: str, tries: int=10) -> dict:

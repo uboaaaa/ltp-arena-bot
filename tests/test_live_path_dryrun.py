@@ -7,7 +7,7 @@ trigger - the exact code that runs at 3am. No network, no real orders.
 
 
 from decimal import Decimal
-
+import pytest
 import bot.execution as ex
 import bot.state as state_mod
 
@@ -107,3 +107,109 @@ def test_chop_backstop_still_blocks_weak_entries(tmp_path, monkeypatch):
                                   vol_pct=Decimal("0.5"), chg_12h=Decimal("0.3"))
     assert calls["placed"] == []                            # nothing traded
     assert any("chop backstop" in g for g in summary["gate"])
+
+
+# handle_bracket_exit() tests
+
+def _mk_plan_state(tmp_path, monkeypatch):
+    s = _mk_state(tmp_path, monkeypatch)
+    s.set_plan({"tp_pct": Decimal("0.4"), "sl_pct": Decimal("0.35"),
+                "decision_id": "d-test-1", "opened_at": 123.0, "side": "LONG"})
+    return s
+
+
+def test_bracket_exit_take_profit_happy_path(tmp_path, monkeypatch):
+    state = _mk_plan_state(tmp_path, monkeypatch)
+    closed, records = [], []
+    monkeypatch.setattr(ex, "close_position", lambda sym, mn: closed.append(sym) or {"ok": True})
+    monkeypatch.setattr(ex.journal, "record", records.append)
+    ex.handle_bracket_exit(state, ("take_profit", Decimal("0.41")))
+    assert closed == ["BINANCE_PERP_BTC_USDT"]
+    assert records[0]["event"] == "bracket_exit"
+    assert records[0]["decision_id"] == "d-test-1"
+    assert state.active_plan is None
+    assert state.last_bracket_close_at > 0
+    assert state.last_stop_at == 0.0          # winning exits arm NO stop cooldown
+
+
+def test_bracket_exit_stop_loss_arms_cooldown(tmp_path, monkeypatch):
+    state = _mk_plan_state(tmp_path, monkeypatch)
+    monkeypatch.setattr(ex, "close_position", lambda sym, mn: {"ok": True})
+    monkeypatch.setattr(ex.journal, "record", lambda r: None)
+    ex.handle_bracket_exit(state, ("stop_loss", Decimal("-0.35")))
+    assert state.last_stop_at > 0             # revenge-trading brake engaged
+
+
+def test_bracket_exit_max_age_is_a_calm_exit(tmp_path, monkeypatch):
+    state = _mk_plan_state(tmp_path, monkeypatch)
+    monkeypatch.setattr(ex, "close_position", lambda sym, mn: {"ok": True})
+    monkeypatch.setattr(ex.journal, "record", lambda r: None)
+    ex.handle_bracket_exit(state, ("max_age", Decimal("-0.05")))
+    assert state.last_stop_at == 0.0          # timeouts are not punished
+
+
+def test_bracket_exit_close_failure_preserves_state(tmp_path, monkeypatch):
+    state = _mk_plan_state(tmp_path, monkeypatch)
+    records = []
+    def boom(sym, mn):
+        raise RuntimeError("exchange down")
+    monkeypatch.setattr(ex, "close_position", boom)
+    monkeypatch.setattr(ex.journal, "record", records.append)
+    with pytest.raises(RuntimeError):
+        ex.handle_bracket_exit(state, ("stop_loss", Decimal("-0.35")))
+    assert records == []                      # nothing journaled for a close that never happened
+    assert state.active_plan is not None      # plan kept, so the next cycle retries
+    assert state.last_bracket_close_at == 0.0
+
+
+# weak-exit vote tests
+
+def test_no_vote_when_flat():
+    assert not ex.should_call_exit_vote("FLAT", {"action": "LONG", "confidence": 0.9})
+
+def test_no_vote_below_threshold():
+    assert not ex.should_call_exit_vote("LONG", {"action": "FLAT", "confidence": 0.64})
+
+def test_vote_at_threshold():
+    assert ex.should_call_exit_vote("LONG", {"action": "FLAT", "confidence": 0.65})
+
+def test_strong_reversal_keeps_existing_path():
+    assert not ex.should_call_exit_vote("LONG", {"action": "SHORT", "confidence": 0.85})
+
+def test_agreement_is_not_an_exit():
+    assert not ex.should_call_exit_vote("LONG", {"action": "LONG", "confidence": 0.9})
+
+def test_count_exit_votes_mixed():
+    votes = [{"action": "FLAT"}, {"action": "LONG"}, {"action": "SHORT"}]
+    assert ex.count_exit_votes("LONG", votes) == 2
+
+def test_model_exit_happy_path(tmp_path, monkeypatch):
+    state = _mk_plan_state(tmp_path, monkeypatch)
+    state.update_positions([{"sym": "BINANCE_PERP_BTC_USDT", "positionQty": "0.001",
+                             "avgPrice": "64000", "markPrice": "63900"}])
+    closed, records = [], []
+    monkeypatch.setattr(ex, "close_position", lambda sym, mn: closed.append(sym) or {"ok": True})
+    monkeypatch.setattr(ex.journal, "record", records.append)
+    votes = [{"action": "FLAT", "confidence": 0.7, "reasoning": "a"},
+             {"action": "FLAT", "confidence": 0.5, "reasoning": "b"},
+             {"action": "SHORT", "confidence": 0.6, "reasoning": "c"}]
+    ex.handle_model_exit(state, votes)
+    assert closed == ["BINANCE_PERP_BTC_USDT"]
+    assert records[0]["event"] == "model_exit"
+    assert len(records[0]["votes"]) == 3
+    assert records[0]["pnl_pct"].startswith("-0.15")   # (63900-64000)/64000, long
+    assert state.active_plan is None
+    assert state.last_stop_at == 0.0                   # voluntary exits are not punished
+    assert state.last_bracket_close_at > 0
+
+def test_model_exit_close_failure_preserves_state(tmp_path, monkeypatch):
+    state = _mk_plan_state(tmp_path, monkeypatch)
+    records = []
+    def boom(sym, mn):
+        raise RuntimeError("exchange down")
+    monkeypatch.setattr(ex, "close_position", boom)
+    monkeypatch.setattr(ex.journal, "record", records.append)
+    with pytest.raises(RuntimeError):
+        ex.handle_model_exit(state, [{"action": "FLAT", "confidence": 0.7}])
+    assert records == []
+    assert state.active_plan is not None

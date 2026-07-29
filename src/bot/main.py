@@ -19,7 +19,9 @@ from bot.config import (
     HEARTBEAT_INTERVAL,
     RISK_INTERVAL,
     STRATEGY_INTERVAL,
-    SYMBOL
+    SYMBOL,
+    EXIT_VOTE_CALLS,
+    EXIT_VOTES_NEEDED
 )
 from bot.state import BotState
 from bot.execution import (
@@ -27,6 +29,11 @@ from bot.execution import (
     check_bracket,
     avg_hourly_range_pct,
     change_12h_pct,
+    handle_bracket_exit,
+    current_stance,
+    should_call_exit_vote,
+    count_exit_votes,
+    handle_model_exit
 )
 from bot import journal
 
@@ -39,7 +46,6 @@ from broker.rapidx import (
     get_funding_rate,
     cancel_all_orders,
     close_all_positions,
-    close_position
 )
 
 # feed imports
@@ -97,21 +103,7 @@ async def risk_monitor(state: BotState) -> None:
                 log.info("BRACKET %s at %+.3f%%", reason, pnl_pct)
                 if EXECUTION_ENABLED:
                     try:
-                        result = await asyncio.to_thread(close_position, SYMBOL, str(state.equity or 1000))
-                        journal.record({
-                            "event" : "bracket_exit",
-                            "trigger" : reason,
-                            "pnl_pct" : str(pnl_pct),
-                            "decision_id" : (state.active_plan or {}).get("decision_id"),
-                            "plan" : {k : str(v) for k, v in (state.active_plan or {}).items()},
-                            "result" : result,
-                        })  
-                        state.set_plan(None)
-                        state.last_bracket_close_at = time.time()
-                        state.last_write_at = time.time()
-                        if reason == "stop_loss":
-                            state.last_stop_at = time.time()
-                            
+                        await asyncio.to_thread(handle_bracket_exit, state, trigger)
                     except Exception:
                         log.critical("BRACKET CLOSE FAILED (%s at %+.3f%%); POSITION UNPROTECTED! Retrying next cycle", reason, pnl_pct, exc_info=True)
         
@@ -173,7 +165,22 @@ async def strategy_loop(state: BotState) -> None:
                 else:
                     state.update_decision(decision)
                     log.info("strategy: decision=%s   conf=%f   reason=%s", decision['action'], decision['confidence'], decision['reasoning'])
-                    if EXECUTION_ENABLED:
+                    stance = current_stance(state.open_positions)
+                    if EXECUTION_ENABLED and should_call_exit_vote(stance, decision):
+                        votes = [decision]
+                        for _ in range(EXIT_VOTE_CALLS):
+                            extra = parse_llm_decision(await asyncio.to_thread(ask_llm, prompt))
+                            if extra:
+                                votes.append(extra)
+                        tally = count_exit_votes(stance, votes)
+                        if tally >= EXIT_VOTES_NEEDED:
+                            log.info("MODEL EXIT vote passed (%d of %d): closing %s", tally, len(votes), stance)
+                            entry["execution"] = await asyncio.to_thread(handle_model_exit, state, votes)
+                        else:
+                            log.info("Model exit vote failed (%d of %d): holding", tally, len(votes))
+                            entry["execution"] = {"transition" : "VOTE_HOLD", "votes_for_exit" : tally}
+
+                    elif EXECUTION_ENABLED:
                         result = await asyncio.to_thread(execute_decision, state, decision, decision_id, vol_pct, chg_12h)
                         entry["execution"] = result
                         log.info("execution summary: %s", json.dumps(result, default=str))

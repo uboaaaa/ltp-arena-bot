@@ -47,7 +47,7 @@ def load_events(path):
                 rec = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            if rec.get("event") == "bracket_exit":
+            if rec.get("event") in ("bracket_exit", "model_exit"):
                 # early records misspelled the key ("deicison_id"); the journal is
                 # append-only history, so the reader tolerates both and falls back
                 # to the id inside the saved plan

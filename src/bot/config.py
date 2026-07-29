@@ -47,3 +47,8 @@ VOL_TP_MULT = Decimal("0.8")
 STOP_COOLDOWN_SECONDS = 2700
 CHOP_THRESHOLD_PCT = Decimal("0.8") # within 12 hrs, changes below this value indicate rangebound market
 CHOP_CONF_FLOOR = 0.7 # minimum confidence to open a position during a chop
+
+# --- bot exit confidence
+EXIT_CONF = 0.65
+EXIT_VOTE_CALLS = 2
+EXIT_VOTES_NEEDED = 2
