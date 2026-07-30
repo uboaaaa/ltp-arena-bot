@@ -31,3 +31,11 @@ hypothesis test, not a proven edge.
 Review: after 15 completed edge-zone trades or -1.0% cumulative category
 net, whichever first; judged by the analyzer's edge-zone-fade row.
 Abort: disable the flag at the -1.0% cap.
+### Review 1 (2026-07-30, at 12 fired votes - pre-registered gate was 10)
+Counterfactual replay of all 8 passed votes: vote exits beat the bracket
+alternative by +1.61% net (5 beats incl. a +1.02% escaped stop, 3 forgone
+take-profits). Abort criterion not triggered. Min-hold-window votes showed
+no adverse pattern (n=2, split). VERDICT: rule kept unchanged.
+Tracked question for review 2 (at 25 fired votes): in 3 of 4 FAILED votes the
+lone minority opinion was right (+0.58% forgone); evaluate honoring first
+signals without a vote, but only with the larger sample.
