@@ -251,7 +251,7 @@ def test_debounce_opposite_signal_resets_the_pending_one(monkeypatch):
 
 def test_derived_brackets_from_volatility():
     tp, sl = derive_brackets(Decimal("0.5"), Decimal("0.6"), Decimal("0.4"))
-    assert tp == Decimal("0.4")    # 0.5 * 0.8
+    assert tp == Decimal("0.3")    # 0.5 * 0.6
     assert sl == Decimal("0.35")   # 0.5 * 0.7
 
 def test_derived_brackets_fall_back_without_vol():

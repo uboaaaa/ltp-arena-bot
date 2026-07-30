@@ -43,7 +43,7 @@ WRITE_SPACING = 6
 
 # --- volatility-derived bracket params ---
 VOL_SL_MULT = Decimal("0.7") # replay-tuned 2026-07-28: kept all winners, halved losses; cliff below 0.5
-VOL_TP_MULT = Decimal("0.8")
+VOL_TP_MULT = Decimal("0.6")
 STOP_COOLDOWN_SECONDS = 2700
 CHOP_THRESHOLD_PCT = Decimal("0.8") # within 12 hrs, changes below this value indicate rangebound market
 CHOP_CONF_FLOOR = 0.7 # minimum confidence to open a position during a chop
