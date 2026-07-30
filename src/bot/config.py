@@ -53,6 +53,11 @@ EXIT_CONF = 0.65
 EXIT_VOTE_CALLS = 2
 EXIT_VOTES_NEEDED = 2
 
+# --- bot entry confirmation vote ---
+ENTRY_VOTE_ENABLED = True
+ENTRY_VOTE_CALLS = 2
+ENTRY_VOTES_NEEDED = 2
+
 # --- edge zone experiments (see experiment doc)
 EDGE_ZONE_ENABLED = True
 EDGE_ZONE_PCT = Decimal("20") # outer band width, as percent of day's range

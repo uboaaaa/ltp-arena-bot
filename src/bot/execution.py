@@ -245,6 +245,10 @@ def count_exit_votes(stance: str, decisions: list) -> int:
     """ How many collected opinions vote to be out of this position """
     return sum(1 for d in decisions if d and d.get("action") != stance)
 
+def count_agreeing_votes(action: str, decisions: list) -> int:
+    """ How many collected opinions propose the same direction """
+    return sum(1 for d in decisions if d and d.get("action") == action)
+
 def ticker_range_position_pct(ticker: dict) -> Decimal | None:
     """ Where the last price sits in relation to the day's range. 0 means it's at the low end, 100 means it's at the high end """
     try:

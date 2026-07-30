@@ -288,3 +288,21 @@ def test_edge_zone_chase_still_gated(tmp_path, monkeypatch):
                                   vol_pct=Decimal("0.5"), chg_12h=Decimal("0.3"),
                                   range_pos=Decimal("85"))    # buying at the top
     assert calls["placed"] == []
+
+# entry-vote tests
+
+def test_count_agreeing_votes_unanimous():
+    votes = [{"action": "LONG"}, {"action": "LONG"}, {"action": "LONG"}]
+    assert ex.count_agreeing_votes("LONG", votes) == 3
+
+def test_count_agreeing_votes_split():
+    votes = [{"action": "LONG"}, {"action": "SHORT"}, {"action": "FLAT"}]
+    assert ex.count_agreeing_votes("LONG", votes) == 1
+
+def test_count_agreeing_votes_flat_dissent_is_not_agreement():
+    votes = [{"action": "LONG"}, {"action": "FLAT"}, {"action": "FLAT"}]
+    assert ex.count_agreeing_votes("LONG", votes) == 1
+
+def test_count_agreeing_votes_tolerates_unparsed_none():
+    votes = [{"action": "SHORT"}, None, {"action": "SHORT"}]
+    assert ex.count_agreeing_votes("SHORT", votes) == 2

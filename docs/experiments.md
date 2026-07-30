@@ -48,3 +48,17 @@ TP finding: 0.6 x vol beat the live 0.8 in BOTH independent samples
 (+0.25% and +1.23%); registered question resolved -> RECOMMEND VOL_TP_MULT
 0.8 -> 0.6. All grid cells negative again: entry quality remains the
 frontier (third confirmation).
+
+## Entry confirmation vote (enabled 2026-07-30)
+Rule: while flat, a proposed LONG/SHORT at conf >= 0.6 triggers two extra
+model calls on the same prompt; the entry proceeds only if at least 2 of 3
+opinions agree on the direction. The original decision executes (brackets
+derive from it); the vote only gates. All three opinions journaled under
+entry_votes.
+Evidence at adoption: documented model flip-flops on near-identical prompts;
+2026-07-30 churn (three single-opinion 0.6-conf entries, all losses, one
+renounced 3-0 by its own exit vote 5 min later); exit-side sibling mechanism
+beat its counterfactual +1.61% at review 1.
+Review: after 15 FAILED entry votes, counterfactual-replay the skipped
+entries. Abort: disable if skipped entries would have netted > +1.5%
+(the filter is blocking good trades).

@@ -21,7 +21,11 @@ from bot.config import (
     STRATEGY_INTERVAL,
     SYMBOL,
     EXIT_VOTE_CALLS,
-    EXIT_VOTES_NEEDED
+    EXIT_VOTES_NEEDED,
+    ENTRY_VOTE_ENABLED,
+    ENTRY_VOTE_CALLS,
+    ENTRY_VOTES_NEEDED,
+    CONF_FLOOR
 )
 from bot.state import BotState
 from bot.execution import (
@@ -34,7 +38,8 @@ from bot.execution import (
     should_call_exit_vote,
     count_exit_votes,
     handle_model_exit,
-    ticker_range_position_pct
+    ticker_range_position_pct,
+    count_agreeing_votes
 )
 from bot import journal
 
@@ -182,6 +187,26 @@ async def strategy_loop(state: BotState) -> None:
                         else:
                             log.info("Model exit vote failed (%d of %d): holding", tally, len(votes))
                             entry["execution"] = {"transition" : "VOTE_HOLD", "votes_for_exit" : tally}
+                    
+                    elif (EXECUTION_ENABLED and ENTRY_VOTE_ENABLED
+                            and stance == "FLAT"
+                            and decision["action"] in ("LONG", "SHORT")
+                            and float(decision["confidence"]) >= CONF_FLOOR):
+                        votes = [decision]
+                        for _ in range(ENTRY_VOTE_CALLS):
+                            extra = parse_llm_decision(await asyncio.to_thread(ask_llm, prompt))
+                            if extra:
+                                votes.append(extra)
+                        tally = count_agreeing_votes(decision["action"], votes)
+                        entry["entry_votes"] = [{"action" : v.get("action"), "confidence" : v.get("confidence")} for v in votes]
+                        if tally >= ENTRY_VOTES_NEEDED:
+                            log.info("ENTRY vote passed (%d of %d): proceeding with %s", tally, len(votes), decision["action"])
+                            result = await asyncio.to_thread(execute_decision, state, decision, decision_id, vol_pct, chg_12h, range_pos)
+                            entry["execution"] = result
+                            log.info("execution summary: %s", json.dumps(result, default=str))
+                        else:
+                            log.info("ENTRY vote failed (%d of %d): skipping %s", tally, len(votes), decision["action"])
+                            entry["execution"] = {"transition" : "ENTRY_VOTE_FAIL", "votes_for" : tally}
 
                     elif EXECUTION_ENABLED:
                         result = await asyncio.to_thread(execute_decision, state, decision, decision_id, vol_pct, chg_12h, range_pos)
