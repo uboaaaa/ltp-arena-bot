@@ -26,6 +26,11 @@ the upper third. A short-term downtrend that has already reached range support i
 a short; it is FLAT, or a small fade-long at the extreme. Only when the 12h move \
 exceeds that threshold should you trade in the direction of the trend.
 
+The 5-minute closes reveal moves that began within the last hour, before they \
+appear in hourly candles. A fresh move visible there can justify an earlier \
+trend entry - but weigh it against the regime rules; small 5-minute \
+fluctuations in a rangebound market are noise, not signals.
+
 When headlines are provided, weigh them explicitly. A concrete catalyst - a regulatory \
 decision, large fund flows, a major liquidation, a notable whale move - can justify a \
 directional view that price action alone would not support, and can also argue against one. \
@@ -64,7 +69,18 @@ def summarize_klines(klines_response) -> str:
         f"range {min(lows)} - {max(highs)}, hourly closes: " + " ".join(f"{c:.0f}" for c in closes)
     )
 
-def build_prompt(ticker: dict, klines_response, funding_rows, headlines, state) -> str:
+def summarize_recent_5m(klines_response) -> str:
+    """ The last hour at 5 minute resolution. Need this to see what hourly candle summaries can't show """
+    candles = klines_response.get("candles", []) if isinstance(klines_response, dict) else klines_response
+    if not candles:
+        return "no recent 5-minute data available"
+    closes = [Decimal(c[4]) for c in candles]
+    change = (closes[-1] - closes[0]) / closes[0] * 100
+    return (
+        f"last 60 min change {change:+.2f}%, 5-minute closes: "
+        + " ".join(f"{c:.0f}" for c in closes)
+    )
+def build_prompt(ticker: dict, klines_response, funding_rows, headlines, state, klines_5m=None) -> str:
     """ assembles full decision prompt from collated market data """
     funding = funding_rows[0]["fundingRate"] if funding_rows else "unknown"
     evidence = [
@@ -76,6 +92,8 @@ def build_prompt(ticker: dict, klines_response, funding_rows, headlines, state) 
     if headlines:
         news = "\n".join(f" - {h}" for h in headlines[:5])
         evidence.append(f"- recent headlines:\n{news}")
+    if klines_5m:
+        evidence.append(f"- {summarize_recent_5m(klines_5m)}")
 
     evidence.append(f"- our stance: {describe_stance(state)}")
     return f"{PROMPT_HEADER}\nCurrent evidence for BTC perpetual:\n" + "\n".join(evidence)

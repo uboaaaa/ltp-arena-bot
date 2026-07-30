@@ -135,6 +135,7 @@ async def strategy_loop(state: BotState) -> None:
             else:
                 ticker = await asyncio.to_thread(get_ticker, SYMBOL)
                 klines = await asyncio.to_thread(get_klines, SYMBOL)
+                klines_5m = await asyncio.to_thread(get_klines, SYMBOL, "5m", 12)
                 range_pos = ticker_range_position_pct(ticker)
                 vol_pct = avg_hourly_range_pct(klines)
                 chg_12h = change_12h_pct(klines)
@@ -148,7 +149,7 @@ async def strategy_loop(state: BotState) -> None:
                     log.warning("news fetch failed. continuing without headlines.", exc_info=True)
                     headlines = []
 
-                prompt = build_prompt(ticker, klines, funding, headlines, state)
+                prompt = build_prompt(ticker, klines, funding, headlines, state, klines_5m)
                 raw = await asyncio.to_thread(ask_llm, prompt)
                 decision = parse_llm_decision(raw)
                 decision_id = f"d-{int(time.time() * 1000)}"
