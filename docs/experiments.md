@@ -39,3 +39,12 @@ no adverse pattern (n=2, split). VERDICT: rule kept unchanged.
 Tracked question for review 2 (at 25 fired votes): in 3 of 4 FAILED votes the
 lone minority opinion was right (+0.58% forgone); evaluate honoring first
 signals without a vote, but only with the larger sample.
+
+### Stop review (2026-07-30, at 11 completed trades under the 0.7 stop)
+Replay of the new-era entries: live 0.7 stop beat the old 1.3 by ~+0.47%.
+Far-tight stops (0.4-0.5) flipped from worst (review 1) to best (this week)
+- regime-dependent, so no further tightening; SL 0.7 KEPT.
+TP finding: 0.6 x vol beat the live 0.8 in BOTH independent samples
+(+0.25% and +1.23%); registered question resolved -> RECOMMEND VOL_TP_MULT
+0.8 -> 0.6. All grid cells negative again: entry quality remains the
+frontier (third confirmation).
