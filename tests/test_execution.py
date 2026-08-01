@@ -268,8 +268,19 @@ def test_chop_backstop_gates_low_conviction():
                                vol_pct=Decimal("0.5"), chg_12h=Decimal("0.3"))
     assert any("chop backstop" in r for r in summary["gate"])
 
-def test_chop_backstop_allows_high_conviction():
+def test_chop_backstop_gates_everything_in_trend_only_mode():
+    # trend-only pivot 2026-08-01: CHOP_CONF_FLOOR is 1.01, so NO confidence
+    # passes in a rangebound regime - even a 0.9-conviction call is refused
+    d = dict(DECISION, confidence=0.9)
+    summary = execute_decision(FakeState(), d, "d-chop2",
+                               vol_pct=Decimal("0.5"), chg_12h=Decimal("0.3"))
+    assert any("chop backstop" in r for r in summary["gate"])
+
+def test_chop_backstop_mechanism_allows_conf_above_floor(monkeypatch):
+    # the mechanism itself, tested at a reachable floor
+    import bot.execution as exmod
+    monkeypatch.setattr(exmod, "CHOP_CONF_FLOOR", 0.7)
     d = dict(DECISION, confidence=0.75)
-    summary = execute_decision(FakeState(halted=True, halt_reason="test"), d, "d-chop2",
+    summary = execute_decision(FakeState(halted=True, halt_reason="test"), d, "d-chop3",
                                vol_pct=Decimal("0.5"), chg_12h=Decimal("0.3"))
     assert not any("chop backstop" in r for r in summary["gate"])
