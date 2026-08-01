@@ -316,13 +316,13 @@ def test_size_mult_doubles_quantity(tmp_path, monkeypatch):
     ex.execute_decision(state, dict(DECISION_LONG), "d-boost-1",
                         vol_pct=Decimal("0.5"), chg_12h=Decimal("1.2"),
                         size_mult=Decimal("2"))
-    # 1000 * 0.25 fraction * 0.5 conviction = 125 notional -> 0.002 lots, x2 boost = 0.004
-    assert Decimal(calls["placed"][0]["quantity"]) == Decimal("0.004")
+    # flattened tiers: 1000 * 0.25 = 250 notional -> 0.004 lots, x2 boost = 0.008
+    assert Decimal(calls["placed"][0]["quantity"]) == Decimal("0.008")
 
 def test_default_size_unchanged(tmp_path, monkeypatch):
     state = _mk_state(tmp_path, monkeypatch)
     calls = _mock_broker(monkeypatch, "BUY")
     summary = ex.execute_decision(state, dict(DECISION_LONG), "d-boost-2",
                                   vol_pct=Decimal("0.5"), chg_12h=Decimal("1.2"))
-    assert Decimal(calls["placed"][0]["quantity"]) == Decimal("0.002")
+    assert Decimal(calls["placed"][0]["quantity"]) == Decimal("0.004")
     assert "size_mult" not in summary

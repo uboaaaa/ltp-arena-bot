@@ -69,8 +69,9 @@ def test_transition_short_to_long_reverses():
 def test_conviction_below_floor_is_zero():
     assert conviction_multiplier(0.5) == Decimal("0")
 
-def test_conviction_at_floor_is_half():
-    assert conviction_multiplier(0.6) == Decimal("0.5")
+def test_conviction_at_floor_is_full():
+    # audit 2026-08-02: confidence is non-predictive, half tier removed
+    assert conviction_multiplier(0.6) == Decimal("1")
 
 def test_conviction_at_full_is_full():
     assert conviction_multiplier(0.8) == Decimal("1")
@@ -90,17 +91,16 @@ def test_size_full_conviction_btc():
     qty = size_order(Decimal("1000"), 0.9, Decimal("65000"), Decimal("0.001"), Decimal("50"))
     assert qty == Decimal("0.004")
 
-def test_size_half_conviction_btc():
-    # 1000 * 0.25 * 0.5 = 125 target
-    # 125 / 65000 = 0.00192 -> snap up to 0.002
+def test_size_mid_confidence_now_full():
+    # flattened tiers: 1000 * 0.25 * 1.0 = 250 target -> 0.004
     qty = size_order(Decimal("1000"), 0.7, Decimal("65000"), Decimal("0.001"), Decimal("50"))
-    assert qty == Decimal("0.002")
+    assert qty == Decimal("0.004")
 
 def test_size_bump_up_to_min_notional(monkeypatch):
     # mechanism test at the original 0.08 fraction: target 40 < min_notional 50,
     # should bump up to 50, within the 1.5x cap
     import bot.execution as exmod
-    monkeypatch.setattr(exmod, "BASE_POSITION_FRACTION", Decimal("0.08"))
+    monkeypatch.setattr(exmod, "BASE_POSITION_FRACTION", Decimal("0.04"))
     qty = size_order(Decimal("1000"), 0.7, Decimal("1"), Decimal("1"), Decimal("50"))
     assert qty == Decimal("50")
 
@@ -230,7 +230,7 @@ def test_debounce_first_signal_does_not_trade(monkeypatch):
     import bot.execution as ex
     monkeypatch.setattr(ex, "REQUIRE_CONFIRMATION", True)
     state = FakeState()
-    summary = execute_decision(state, DECISION, "d-1")
+    summary = execute_decision(state, DECISION, "d-1", vol_pct=Decimal("0.5"), chg_12h=Decimal("1.2"))
     assert any("awaiting confirmation" in r for r in summary["gate"])
     assert summary["orders"] == []
     assert state.pending_signal == "LONG"
@@ -240,7 +240,7 @@ def test_debounce_second_matching_signal_clears_confirmation(monkeypatch):
     monkeypatch.setattr(ex, "REQUIRE_CONFIRMATION", True)
     # halted so it stops at the risk gate instead of reaching the network
     state = FakeState(pending_signal="LONG", halted=True, halt_reason="test")
-    summary = execute_decision(state, DECISION, "d-2")
+    summary = execute_decision(state, DECISION, "d-2", vol_pct=Decimal("0.5"), chg_12h=Decimal("1.2"))
     assert not any("awaiting confirmation" in r for r in summary["gate"])
     assert any("halted" in r for r in summary["gate"])
 
@@ -248,7 +248,7 @@ def test_debounce_opposite_signal_resets_the_pending_one(monkeypatch):
     import bot.execution as ex
     monkeypatch.setattr(ex, "REQUIRE_CONFIRMATION", True)
     state = FakeState(pending_signal="LONG")
-    summary = execute_decision(state, dict(DECISION, action="SHORT"), "d-3")
+    summary = execute_decision(state, dict(DECISION, action="SHORT"), "d-3", vol_pct=Decimal("0.5"), chg_12h=Decimal("-1.2"))
     assert any("awaiting confirmation" in r for r in summary["gate"])
     assert state.pending_signal == "SHORT"
 

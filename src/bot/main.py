@@ -26,7 +26,9 @@ from bot.config import (
     ENTRY_VOTE_CALLS,
     ENTRY_VOTES_NEEDED,
     CONF_FLOOR,
-    UNANIMITY_SIZE_MULT
+    UNANIMITY_SIZE_MULT,
+    TREND_SCAN_INTERVAL,
+    CHOP_THRESHOLD_PCT
 )
 from bot.state import BotState
 from bot.execution import (
@@ -99,6 +101,11 @@ async def risk_monitor(state: BotState) -> None:
         try:
             equity = await asyncio.to_thread(get_equity)
             state.update_equity(equity)
+            ranking_day = (int(time.time()) - 57600) // 86400   # 16:00 UTC ranking-day boundary
+            if state.ranking_day != ranking_day:
+                state.ranking_day = ranking_day
+                state.day_start_equity = equity
+                log.info("ranking day rollover: anchor equity %s", equity)
             positions = await asyncio.to_thread(get_open_positions)
             state.update_positions(positions)
 
@@ -155,6 +162,9 @@ async def strategy_loop(state: BotState) -> None:
                     log.warning("news fetch failed. continuing without headlines.", exc_info=True)
                     headlines = []
 
+                if (chg_12h is not None and abs(chg_12h) >= CHOP_THRESHOLD_PCT
+                        and current_stance(state.open_positions) == "FLAT"):
+                    sleep_for = TREND_SCAN_INTERVAL   # scan faster while flat in a trending market
                 prompt = build_prompt(ticker, klines, funding, headlines, state, klines_5m)
                 raw = await asyncio.to_thread(ask_llm, prompt)
                 decision = parse_llm_decision(raw)
@@ -199,9 +209,9 @@ async def strategy_loop(state: BotState) -> None:
                             if extra:
                                 votes.append(extra)
                         tally = count_agreeing_votes(decision["action"], votes)
-                        entry["entry_votes"] = [{"action" : v.get("action"), "confidence" : v.get("confidence")} for v in votes]
+                        entry["entry_votes"] = [{"action" : v.get("action"), "confidence" : v.get("confidence"), "catalyst" : v.get("catalyst")} for v in votes]
                         if tally >= ENTRY_VOTES_NEEDED:
-                            boost = UNANIMITY_SIZE_MULT if (tally == 3 and len(votes) == 3 and decision.get("catalyst") is True) else None
+                            boost = UNANIMITY_SIZE_MULT if (tally == 3 and len(votes) == 3 and any(v.get("catalyst") is True for v in votes)) else None
                             log.info("ENTRY vote passed (%d of %d): proceeding with %s%s", tally, len(votes), decision["action"], " [UNANIMITY BOOST]" if boost else "")
                             if boost:
                                 result = await asyncio.to_thread(execute_decision, state, decision, decision_id, vol_pct, chg_12h, range_pos, boost)
@@ -229,7 +239,7 @@ async def strategy_loop(state: BotState) -> None:
         except Exception:
             log.exception("strategy cycle failed. will retry next interval!")
         
-        await asyncio.sleep(STRATEGY_INTERVAL)
+        await asyncio.sleep(sleep_for)
 
 async def heartbeat(state: BotState) -> None:
     while True:

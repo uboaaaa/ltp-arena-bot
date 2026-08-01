@@ -34,7 +34,8 @@ from bot.config import (
     MAX_SL_PCT,
     EXIT_CONF,
     EDGE_ZONE_ENABLED,
-    EDGE_ZONE_PCT
+    EDGE_ZONE_PCT,
+    DAILY_LOSS_LIMIT
 )
 
 from broker.rapidx import (
@@ -80,8 +81,9 @@ def conviction_multiplier(confidence: float) -> Decimal:
     """ if less than floor, return 0 (i.e., do not trade). if between floor and full, return half mult. if beyond full, return full mult. """
     if confidence < CONF_FLOOR:
         return Decimal("0")
-    if confidence < CONF_FULL:
-        return Decimal("0.5")
+    # audit 2026-08-02: confidence is measured non-predictive of outcomes (no band
+    # has positive edge), so the half tier carried zero information - every
+    # qualifying trade takes full size. CONF_FULL still gates reversals only.
     return Decimal("1")
 
 def size_order(equity: Decimal, confidence: float, price: Decimal, lot: Decimal, min_notional: Decimal) -> Decimal | None:
@@ -102,6 +104,11 @@ def gate_check(state, transition: str) -> list[str]:
     reasons = []
     if state.halted:
         reasons.append(f"halted: {state.halt_reason}")
+    day_eq = getattr(state, "day_start_equity", None)
+    if (day_eq is not None and state.equity is not None
+            and transition.startswith(("OPEN", "CLOSE_THEN"))
+            and state.equity - day_eq <= -DAILY_LOSS_LIMIT):
+        reasons.append(f"daily loss breaker: {state.equity - day_eq:.2f} on this ranking day")
     if state.equity is None or state.equity_age > MAX_EQUITY_AGE:
         reasons.append(f"equity stale. age: ({state.equity_age:.0f}s)")
     elif state.equity < SOFT_HALT_EQUITY and transition.startswith(("OPEN", "CLOSE_THEN")):
@@ -183,7 +190,23 @@ def handle_model_exit(state, votes: list) -> dict:
             direction = Decimal("1") if qty > 0 else Decimal("-1")
             pnl_pct = (mark - avg) / avg * Decimal("100") * direction
     
-    result = close_position(SYMBOL, str(state.equity or 1000))
+    try:
+        result = close_position(SYMBOL, str(state.equity or 1000))
+    except Exception as e:
+        if "RCLI24003" in str(e) or "NO_POSITION" in str(e):
+            # bracket close won the race - position already flat; record and move on
+            log.warning("model exit found no position (bracket won the race): %s", e)
+            state.set_plan(None)
+            now = time.time()
+            state.last_bracket_close_at = now
+            state.last_write_at = now
+            record = {"event" : "model_exit", "trigger" : "model_vote_noop",
+                      "pnl_pct" : None, "decision_id" : None, "plan" : {},
+                      "votes" : [{"action" : v.get("action"), "confidence" : v.get("confidence")} for v in votes],
+                      "result" : {"noop" : str(e)[:120]}}
+            journal.record(record)
+            return record
+        raise
     record = {
         "event" : "model_exit",
         "trigger" : "model_vote",
@@ -319,6 +342,20 @@ def execute_decision(state, decision: dict, decision_id, vol_pct=None, chg_12h=N
     if transition in ("NONE", "HOLD"):
         return summary
     
+    if transition.startswith(("OPEN", "CLOSE_THEN")) and (chg_12h is None or vol_pct is None):
+        reason = "missing market data (12h change or volatility): refusing entry"
+        summary["gate"] = [reason]
+        log.info("EXECUTE gated: %s", reason)
+        return summary
+
+    if transition.startswith(("OPEN", "CLOSE_THEN")) and abs(chg_12h) >= CHOP_THRESHOLD_PCT:
+        side = decision["action"]
+        if (chg_12h > 0 and side == "SHORT") or (chg_12h < 0 and side == "LONG"):
+            reason = f"direction alignment: {side} opposes the 12h trend ({chg_12h:+.2f}%)"
+            summary["gate"] = [reason]
+            log.info("EXECUTE gated: %s", reason)
+            return summary
+
     if transition.startswith(("OPEN", "CLOSE_THEN")) and chg_12h is not None:
         if abs(chg_12h) < CHOP_THRESHOLD_PCT and decision["confidence"] < CHOP_CONF_FLOOR:
             if (EDGE_ZONE_ENABLED and range_pos is not None and decision["confidence"] >= CONF_FLOOR and is_edge_zone_fade(decision["action"], range_pos)):

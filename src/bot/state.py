@@ -11,7 +11,7 @@ class BotState:
     "equity", "equity_updated_at", "open_positions", "positions_updated_at",
     "last_decision", "last_decision_at", "last_entry_at", "last_write_at",
     "last_bracket_close_at", "last_stop_at", "halted", "halt_reason",
-    "pending_signal", "active_plan",
+    "pending_signal", "active_plan", "ranking_day", "day_start_equity",
     )
     
     def __init__(self):
@@ -28,6 +28,8 @@ class BotState:
         self.halted: bool = False
         self.halt_reason: str | None = None
         self.pending_signal: str | None = None
+        self.ranking_day: int | None = None
+        self.day_start_equity: Decimal | None = None
         self.active_plan: dict | None = None
     
     def update_equity(self, equity: Decimal) -> None:

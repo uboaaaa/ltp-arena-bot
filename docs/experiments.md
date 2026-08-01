@@ -98,3 +98,20 @@ Risk: ~0.1-0.2 pct of equity per stopped trade; existing halt floors
 (soft 965 / hard 955) are the pre-committed abort. MDD tier may take scars;
 accepted knowingly.
 Review: standing at phase end; abort = the halt floors themselves.
+
+## Audit Tier 1 (2026-08-02, from the 29-agent audit; user: ship it)
+1. Conviction tiers FLATTENED: confidence measured non-predictive (no band has
+   positive edge; model max executed conf 0.72, CONF_FULL 0.8 unreachable),
+   so the silent 0.5x half-sizing is removed - approved sizing now delivers
+   ~250 USD base, ~500 boosted. CONF_FULL still gates reversals.
+2. Unanimity boost accepts catalyst from ANY of the 3 unanimous samples
+   (was first-sample-only); catalyst journaled per vote (was unmeasurable).
+3. Direction-alignment gate: in a trending regime, entries opposing the 12h
+   sign are refused (counter-trend lifetime record 1W/9L).
+4. sleep_for bug fixed (loop hardcoded STRATEGY_INTERVAL, silently disabling
+   the 1800s AI-budget backoff); adaptive cadence 150s while FLAT in trend.
+5. Hardening: model-exit survives the bracket-race NO_POSITION error (prod
+   crash 2026-07-30 13:35); entries fail CLOSED on missing 12h/vol data.
+6. Daily-loss circuit breaker: new entries blocked when ranking-day pnl
+   (16:00 UTC anchor) reaches -1.5 USDT. One -2 day costs ~1.6 Sharpe units.
+Review: standing at phase end; full audit in memory + task output file.
