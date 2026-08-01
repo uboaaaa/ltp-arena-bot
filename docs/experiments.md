@@ -86,3 +86,15 @@ Sharpe percentile (Jul 31 ladder: 4 wins = ~USD 0.90); unanimity+catalyst
 is the highest-evidence gate we have and included the best winners.
 Review: after 10 boosted trades, compare boosted vs single-size outcomes.
 Abort: revert to flat sizing if boosted trades underperform singles.
+
+## Size escalation (2026-08-01, user-approved)
+BASE_POSITION_FRACTION 0.08 -> 0.25 (still 1x leverage, trend-only entries,
+all votes and brackets unchanged; unanimity boost stacks to ~0.5 of equity).
+Rationale: tournament position (rank 44/49, ~11 composite points below the
+cutoff, 20 days left). Cutoff is held by dormant bots at Sharpe -5.3; only
+real green PnL (~+4 to +6 USDT) climbs past it, which is unreachable at
+minimum size. Behind-with-a-deadline = maximize variance.
+Risk: ~0.1-0.2 pct of equity per stopped trade; existing halt floors
+(soft 965 / hard 955) are the pre-committed abort. MDD tier may take scars;
+accepted knowingly.
+Review: standing at phase end; abort = the halt floors themselves.

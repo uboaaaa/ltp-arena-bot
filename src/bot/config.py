@@ -34,7 +34,7 @@ BRACKET_COOLDOWN_SECONDS = 30
 REQUIRE_CONFIRMATION = False
 
 # --- execution ---
-BASE_POSITION_FRACTION = Decimal("0.08")
+BASE_POSITION_FRACTION = Decimal("0.25") # 2026-08-01 size escalation: tournament variance play, see docs/experiments.md
 CONF_FLOOR = 0.6
 CONF_FULL = 0.8
 MIN_HOLD_SECONDS = 900

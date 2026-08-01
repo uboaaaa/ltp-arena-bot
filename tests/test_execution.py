@@ -85,24 +85,30 @@ def test_size_returns_none_without_conviction():
     assert size_order(Decimal("1000"), 0.5, Decimal("65000"), Decimal("0.001"), Decimal("50")) is None
 
 def test_size_full_conviction_btc():
-    # 1000 * 0.08 * 1.0 = 80 target
-    # 80 / 65000 = 0.00123 -> snap up to 0.002
+    # 1000 * 0.25 * 1.0 = 250 target
+    # 250 / 65000 = 0.00384 -> snap up to 0.004
     qty = size_order(Decimal("1000"), 0.9, Decimal("65000"), Decimal("0.001"), Decimal("50"))
-    assert qty == Decimal("0.002")
+    assert qty == Decimal("0.004")
 
 def test_size_half_conviction_btc():
-    # 1000 * 0.08 * 0.5 = 40 target
-    # 40 / 65000 = 0.00062 -> snap up to 0.001
+    # 1000 * 0.25 * 0.5 = 125 target
+    # 125 / 65000 = 0.00192 -> snap up to 0.002
     qty = size_order(Decimal("1000"), 0.7, Decimal("65000"), Decimal("0.001"), Decimal("50"))
-    assert qty == Decimal("0.001")
+    assert qty == Decimal("0.002")
 
-def test_size_bump_up_to_min_notional():
-    # target 40 < min_notional of 50. should bump up to 50, within cap
+def test_size_bump_up_to_min_notional(monkeypatch):
+    # mechanism test at the original 0.08 fraction: target 40 < min_notional 50,
+    # should bump up to 50, within the 1.5x cap
+    import bot.execution as exmod
+    monkeypatch.setattr(exmod, "BASE_POSITION_FRACTION", Decimal("0.08"))
     qty = size_order(Decimal("1000"), 0.7, Decimal("1"), Decimal("1"), Decimal("50"))
     assert qty == Decimal("50")
 
-def test_size_none_when_min_notional_exceeds_cap():
-    # min_notional of 200 blows past the cap of 1000 * 0.08 * 1.5 = 120
+def test_size_none_when_min_notional_exceeds_cap(monkeypatch):
+    # mechanism test at the original 0.08 fraction: min_notional 200 blows past
+    # the cap of 1000 * 0.08 * 1.5 = 120 -> refuse to trade
+    import bot.execution as exmod
+    monkeypatch.setattr(exmod, "BASE_POSITION_FRACTION", Decimal("0.08"))
     qty = size_order(Decimal("1000"), 0.7, Decimal("1"), Decimal("1"), Decimal("200"))
     assert qty is None
 
