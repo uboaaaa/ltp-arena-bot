@@ -306,3 +306,22 @@ def test_count_agreeing_votes_flat_dissent_is_not_agreement():
 def test_count_agreeing_votes_tolerates_unparsed_none():
     votes = [{"action": "SHORT"}, None, {"action": "SHORT"}]
     assert ex.count_agreeing_votes("SHORT", votes) == 2
+
+
+# unanimity sizing tests
+
+def test_size_mult_doubles_quantity(tmp_path, monkeypatch):
+    state = _mk_state(tmp_path, monkeypatch)
+    calls = _mock_broker(monkeypatch, "BUY")
+    ex.execute_decision(state, dict(DECISION_LONG), "d-boost-1",
+                        vol_pct=Decimal("0.5"), chg_12h=Decimal("1.2"),
+                        size_mult=Decimal("2"))
+    assert Decimal(calls["placed"][0]["quantity"]) == Decimal("0.002")
+
+def test_default_size_unchanged(tmp_path, monkeypatch):
+    state = _mk_state(tmp_path, monkeypatch)
+    calls = _mock_broker(monkeypatch, "BUY")
+    summary = ex.execute_decision(state, dict(DECISION_LONG), "d-boost-2",
+                                  vol_pct=Decimal("0.5"), chg_12h=Decimal("1.2"))
+    assert Decimal(calls["placed"][0]["quantity"]) == Decimal("0.001")
+    assert "size_mult" not in summary

@@ -76,3 +76,13 @@ Expected shape: many zero-trade days punctuated by trend-day clusters.
 This is the NDAR profile and the best available Sharpe shape.
 Review: standing - compare trend-only era daily PnL and Sharpe percentile
 vs the 2026-07-23..31 era at phase end.
+
+## Unanimity sizing (2026-08-01)
+Rule: an entry that passes its vote 3-of-3 (all opinions same direction, no
+parse failures) AND carries catalyst=true is sized at 2x the minimum lot
+(~13 pct of equity at 1x; worst-case ~0.06 pct of equity per stop). All
+other entries stay at minimum. Rationale: wins are too small to move the
+Sharpe percentile (Jul 31 ladder: 4 wins = ~USD 0.90); unanimity+catalyst
+is the highest-evidence gate we have and included the best winners.
+Review: after 10 boosted trades, compare boosted vs single-size outcomes.
+Abort: revert to flat sizing if boosted trades underperform singles.

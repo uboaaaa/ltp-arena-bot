@@ -53,6 +53,9 @@ EXIT_CONF = 0.65
 EXIT_VOTE_CALLS = 2
 EXIT_VOTES_NEEDED = 2
 
+# --- unanimity sizing: unanimous 3-of-3 entry vote + catalyst doubles size ---
+UNANIMITY_SIZE_MULT = Decimal("2")
+
 # --- bot entry confirmation vote ---
 ENTRY_VOTE_ENABLED = True
 ENTRY_VOTE_CALLS = 2

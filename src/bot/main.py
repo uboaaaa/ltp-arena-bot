@@ -25,7 +25,8 @@ from bot.config import (
     ENTRY_VOTE_ENABLED,
     ENTRY_VOTE_CALLS,
     ENTRY_VOTES_NEEDED,
-    CONF_FLOOR
+    CONF_FLOOR,
+    UNANIMITY_SIZE_MULT
 )
 from bot.state import BotState
 from bot.execution import (
@@ -200,8 +201,12 @@ async def strategy_loop(state: BotState) -> None:
                         tally = count_agreeing_votes(decision["action"], votes)
                         entry["entry_votes"] = [{"action" : v.get("action"), "confidence" : v.get("confidence")} for v in votes]
                         if tally >= ENTRY_VOTES_NEEDED:
-                            log.info("ENTRY vote passed (%d of %d): proceeding with %s", tally, len(votes), decision["action"])
-                            result = await asyncio.to_thread(execute_decision, state, decision, decision_id, vol_pct, chg_12h, range_pos)
+                            boost = UNANIMITY_SIZE_MULT if (tally == 3 and len(votes) == 3 and decision.get("catalyst") is True) else None
+                            log.info("ENTRY vote passed (%d of %d): proceeding with %s%s", tally, len(votes), decision["action"], " [UNANIMITY BOOST]" if boost else "")
+                            if boost:
+                                result = await asyncio.to_thread(execute_decision, state, decision, decision_id, vol_pct, chg_12h, range_pos, boost)
+                            else:
+                                result = await asyncio.to_thread(execute_decision, state, decision, decision_id, vol_pct, chg_12h, range_pos)
                             entry["execution"] = result
                             log.info("execution summary: %s", json.dumps(result, default=str))
                         else:

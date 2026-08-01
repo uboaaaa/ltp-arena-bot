@@ -307,7 +307,7 @@ def _open(side, qty, price_cap, state, decision, decision_id) -> dict:
     log.info("EXECUTE result: state=%s  filled=%s  avg=%s", result.get("orderState"), result.get("executedQty"), result.get("executedAvgPrice"))
     return result
 
-def execute_decision(state, decision: dict, decision_id, vol_pct=None, chg_12h=None, range_pos=None) -> dict:
+def execute_decision(state, decision: dict, decision_id, vol_pct=None, chg_12h=None, range_pos=None, size_mult=Decimal("1")) -> dict:
     """ FULL PIPELINE: stance -> transition -> gate -> orders.
     Retuns summary dict for reasoning logs """
     summary = {"decision" : decision, "transition" : None, "gate" : [], "orders" : []}
@@ -377,6 +377,10 @@ def execute_decision(state, decision: dict, decision_id, vol_pct=None, chg_12h=N
             summary["gate"].append("sizing returned None (low conviction or min-notional conflict)")
             log.info("EXECUTE skipped: %s", summary["gate"][-1])
             return summary
+        if size_mult != Decimal("1"):
+            qty = qty * size_mult
+            summary["size_mult"] = str(size_mult)
+            log.info("EXECUTE unanimity boost: size x%s -> qty %s", size_mult, qty)
         if transition.endswith("LONG"):
             cap = snap_down(last * Decimal("1.002"), tick)
             summary["orders"].append({
