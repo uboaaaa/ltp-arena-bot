@@ -46,7 +46,7 @@ VOL_SL_MULT = Decimal("0.7") # replay-tuned 2026-07-28: kept all winners, halved
 VOL_TP_MULT = Decimal("0.6")
 STOP_COOLDOWN_SECONDS = 2700
 CHOP_THRESHOLD_PCT = Decimal("0.8") # within 12 hrs, changes below this value indicate rangebound market
-CHOP_CONF_FLOOR = 0.7 # minimum confidence to open a position during a chop
+CHOP_CONF_FLOOR = 1.01 # trend-only mode 2026-08-01: unreachable bar = NO entries in rangebound regime (see docs/experiments.md)
 
 # --- bot exit confidence ---
 EXIT_CONF = 0.65
@@ -59,5 +59,5 @@ ENTRY_VOTE_CALLS = 2
 ENTRY_VOTES_NEEDED = 2
 
 # --- edge zone experiments (see experiment doc)
-EDGE_ZONE_ENABLED = True
+EDGE_ZONE_ENABLED = False # experiment closed 2026-08-01: trend-only pivot
 EDGE_ZONE_PCT = Decimal("20") # outer band width, as percent of day's range

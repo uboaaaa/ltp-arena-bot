@@ -62,3 +62,17 @@ beat its counterfactual +1.61% at review 1.
 Review: after 15 FAILED entry votes, counterfactual-replay the skipped
 entries. Abort: disable if skipped entries would have netted > +1.5%
 (the filter is blocking good trades).
+
+## Trend-only pivot (2026-08-01)
+Every green period in the bot's life was a trend day (Jul 24, Jul 27-28,
+Jul 31 ladder); chop-adjacent trading has been net negative lifetime across
+every category (chop entries, fades, marginal-conf entries). Three replay
+studies showed the entry population carries no edge that exit geometry can
+rescue. Decision: stop paying the chop tax entirely.
+Changes: CHOP_CONF_FLOOR raised to 1.01 (no rangebound entries can pass);
+edge-zone experiment CLOSED EARLY at 2 of 15 trades (1 stop-loss, 1 vote
+scratch - insufficient opportunity, superseded by this pivot).
+Expected shape: many zero-trade days punctuated by trend-day clusters.
+This is the NDAR profile and the best available Sharpe shape.
+Review: standing - compare trend-only era daily PnL and Sharpe percentile
+vs the 2026-07-23..31 era at phase end.
