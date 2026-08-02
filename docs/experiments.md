@@ -128,3 +128,18 @@ Review: standing at phase end; full audit in memory + task output file.
    acknowledged (model tp/sl advisory), ~1h force-close disclosed, real fees
    (0.05%), dead chop-fade language removed. JSON contract unchanged.
 Review: standing at phase end; per-change notes in the sweep results file.
+
+## Trailing ratchet on boosted trades (2026-08-02); trend-onset carve-out REJECTED
+Ratchet (boosted = unanimous 3-of-3 + catalyst entries only): fixed take-profit
+replaced by a trail - at +0.6x vol the stop locks to +0.08% (fees floor) and
+trails the peak by 0.7x vol; only ever tightens. Trail exits (trigger
+trail_stop) carry no stop cooldown; an armed ratchet suppresses exit votes
+(the trade is risk-free, the trail owns the exit). Regular trades unchanged.
+Judged at the pre-registered 10-boosted-trade review. Honest basis: +-6
+expected over the window, n=8 replayed, 2 runners drove it - variance play.
+Trend-onset carve-out: REJECTED by its own counterfactual before shipping.
+Full-population replay (all sub-threshold signals with aligned 3h>=0.5,
+flat stance, conf>=0.6, 45-min dedupe, 15m candles pessimistic): n=6 over
+the whole phase, 3 TP / 0 SL / 3 age-outs, net +0.10% total. The earlier
+6-of-8 figure was hindsight-selected on days that became trends. Not worth
+prompt+gate complexity; re-examine only if trend days prove scarcer still.

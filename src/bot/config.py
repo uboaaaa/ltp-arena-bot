@@ -31,6 +31,7 @@ DEFAULT_TP_PCT = Decimal("0.6")
 DEFAULT_SL_PCT = Decimal("0.4")
 MAX_POSITION_AGE_SECONDS = 3600            # sweep 2026-08-02: 60-120min hold zone ran 9% winrate
 MAX_POSITION_AGE_BOOSTED_SECONDS = 7200    # boosted trades keep a longer leash
+RATCHET_FLOOR_PCT = Decimal("0.08")        # once the ratchet arms, never exit below fees+slippage
 BRACKET_COOLDOWN_SECONDS = 30
 REQUIRE_CONFIRMATION = False
 

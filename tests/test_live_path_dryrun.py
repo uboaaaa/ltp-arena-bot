@@ -352,3 +352,39 @@ def test_boosted_plan_gets_longer_max_age(tmp_path, monkeypatch):
     state.set_plan(plan2)
     trigger = ex.check_bracket(state)
     assert trigger is not None and trigger[0] == "max_age"   # 5000s > 3600s normal cap
+
+
+# trailing ratchet tests
+
+def _boosted_state(tmp_path, monkeypatch, mark, peak=None, armed=False):
+    import time as _t
+    state = _mk_state(tmp_path, monkeypatch)
+    state.update_positions([{"sym": "BINANCE_PERP_BTC_USDT", "positionQty": "0.002",
+                             "avgPrice": "64000", "markPrice": mark}])
+    plan = {"tp_pct": Decimal("0.30"), "sl_pct": Decimal("0.35"),
+            "opened_at": _t.time() - 60, "side": "LONG", "boosted": True,
+            "ratchet_armed": armed}
+    if peak is not None:
+        plan["peak_pnl"] = Decimal(peak)
+    state.set_plan(plan)
+    return state
+
+def test_boosted_no_fixed_take_profit(tmp_path, monkeypatch):
+    state = _boosted_state(tmp_path, monkeypatch, "64256")   # +0.40% > tp 0.30
+    assert ex.check_bracket(state) is None                    # does NOT bank - ratchet arms
+    assert state.active_plan["ratchet_armed"] is True
+
+def test_ratchet_trails_peak(tmp_path, monkeypatch):
+    state = _boosted_state(tmp_path, monkeypatch, "64320", peak="0.90", armed=True)  # +0.50 <= 0.90-0.35
+    trigger = ex.check_bracket(state)
+    assert trigger is not None and trigger[0] == "trail_stop"
+
+def test_ratchet_floor_locks_fees(tmp_path, monkeypatch):
+    state = _boosted_state(tmp_path, monkeypatch, "64032", peak="0.32", armed=True)  # +0.05 < floor 0.08
+    trigger = ex.check_bracket(state)
+    assert trigger is not None and trigger[0] == "trail_stop"
+
+def test_boosted_pre_arm_stop_still_works(tmp_path, monkeypatch):
+    state = _boosted_state(tmp_path, monkeypatch, "63740")   # -0.41% below sl
+    trigger = ex.check_bracket(state)
+    assert trigger is not None and trigger[0] == "stop_loss"

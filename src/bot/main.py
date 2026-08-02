@@ -187,7 +187,7 @@ async def strategy_loop(state: BotState) -> None:
                     state.update_decision(decision)
                     log.info("strategy: decision=%s   conf=%f   reason=%s", decision['action'], decision['confidence'], decision['reasoning'])
                     stance = current_stance(state.open_positions)
-                    if EXECUTION_ENABLED and should_call_exit_vote(stance, decision):
+                    if EXECUTION_ENABLED and should_call_exit_vote(stance, decision) and not (state.active_plan or {}).get("ratchet_armed"):
                         votes = [decision]
                         for _ in range(EXIT_VOTE_CALLS):
                             extra = parse_llm_decision(await asyncio.to_thread(ask_llm, prompt))
