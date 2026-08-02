@@ -18,6 +18,7 @@ from bot.config import (
     DEFAULT_TP_PCT,
     MAX_EQUITY_AGE,
     MAX_POSITION_AGE_SECONDS,
+    MAX_POSITION_AGE_BOOSTED_SECONDS,
     MIN_HOLD_SECONDS,
     REQUIRE_CONFIRMATION,
     SOFT_HALT_EQUITY,
@@ -152,7 +153,8 @@ def check_bracket(state) -> tuple[str, Decimal] | None:
         return ("take_profit", pnl_pct)
     if pnl_pct <= -sl:
         return ("stop_loss", pnl_pct)
-    if opened_at and time.time() - opened_at > MAX_POSITION_AGE_SECONDS:
+    age_limit = MAX_POSITION_AGE_BOOSTED_SECONDS if plan.get("boosted") else MAX_POSITION_AGE_SECONDS
+    if opened_at and time.time() - opened_at > age_limit:
         return ("max_age", pnl_pct)
     
     return None
@@ -348,6 +350,13 @@ def execute_decision(state, decision: dict, decision_id, vol_pct=None, chg_12h=N
         log.info("EXECUTE gated: %s", reason)
         return summary
 
+    if transition.startswith(("OPEN", "CLOSE_THEN")) and vol_pct * VOL_TP_MULT < MIN_TP_PCT:
+        reason = (f"volatility too low for fee-viable brackets "
+                  f"(derived tp {vol_pct * VOL_TP_MULT:.3f}% would floor below {MIN_TP_PCT}%)")
+        summary["gate"] = [reason]
+        log.info("EXECUTE gated: %s", reason)
+        return summary
+
     if transition.startswith(("OPEN", "CLOSE_THEN")) and abs(chg_12h) >= CHOP_THRESHOLD_PCT:
         side = decision["action"]
         if (chg_12h > 0 and side == "SHORT") or (chg_12h < 0 and side == "LONG"):
@@ -430,5 +439,9 @@ def execute_decision(state, decision: dict, decision_id, vol_pct=None, chg_12h=N
                 "type" : "open_short",
                 "result" : _open("SELL", qty, cap, state, decision, decision_id)
             })
+        if "size_mult" in summary and state.active_plan:
+            plan = dict(state.active_plan)
+            plan["boosted"] = True
+            state.set_plan(plan)
 
     return summary

@@ -29,7 +29,8 @@ MIN_SL_PCT = Decimal("0.15")
 MAX_SL_PCT = Decimal("1.5")
 DEFAULT_TP_PCT = Decimal("0.6")
 DEFAULT_SL_PCT = Decimal("0.4")
-MAX_POSITION_AGE_SECONDS = 4 * 3600
+MAX_POSITION_AGE_SECONDS = 3600            # sweep 2026-08-02: 60-120min hold zone ran 9% winrate
+MAX_POSITION_AGE_BOOSTED_SECONDS = 7200    # boosted trades keep a longer leash
 BRACKET_COOLDOWN_SECONDS = 30
 REQUIRE_CONFIRMATION = False
 

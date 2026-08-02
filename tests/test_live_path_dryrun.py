@@ -326,3 +326,29 @@ def test_default_size_unchanged(tmp_path, monkeypatch):
                                   vol_pct=Decimal("0.5"), chg_12h=Decimal("1.2"))
     assert Decimal(calls["placed"][0]["quantity"]) == Decimal("0.004")
     assert "size_mult" not in summary
+
+
+# fee-viability gate + boosted max-age tests
+
+def test_low_volatility_entry_refused(tmp_path, monkeypatch):
+    state = _mk_state(tmp_path, monkeypatch)
+    calls = _mock_broker(monkeypatch, "BUY")
+    summary = ex.execute_decision(state, dict(DECISION_LONG), "d-lowvol",
+                                  vol_pct=Decimal("0.2"), chg_12h=Decimal("1.2"))
+    assert calls["placed"] == []
+    assert any("fee-viable" in g for g in summary["gate"])
+
+def test_boosted_plan_gets_longer_max_age(tmp_path, monkeypatch):
+    import time as _t
+    row = {"sym": "BINANCE_PERP_BTC_USDT", "positionQty": "0.001",
+           "avgPrice": "64000", "markPrice": "64000"}
+    plan = {"tp_pct": Decimal("5"), "sl_pct": Decimal("5"),
+            "opened_at": _t.time() - 5000, "side": "LONG", "boosted": True}
+    state = _mk_state(tmp_path, monkeypatch)
+    state.update_positions([row])
+    state.set_plan(plan)
+    assert ex.check_bracket(state) is None          # 5000s < 7200s boosted leash
+    plan2 = dict(plan, boosted=False)
+    state.set_plan(plan2)
+    trigger = ex.check_bracket(state)
+    assert trigger is not None and trigger[0] == "max_age"   # 5000s > 3600s normal cap

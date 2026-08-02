@@ -81,6 +81,7 @@ async def startup_reconciliation(state: BotState) -> None:
     try:
         equity = await asyncio.to_thread(get_equity)
         state.update_equity(equity)
+        state.load_day_anchor((int(time.time()) - 57600) // 86400)
         positions = await asyncio.to_thread(get_open_positions)
         state.update_positions(positions)
         if positions:
@@ -105,6 +106,7 @@ async def risk_monitor(state: BotState) -> None:
             if state.ranking_day != ranking_day:
                 state.ranking_day = ranking_day
                 state.day_start_equity = equity
+                state.persist_day_anchor()
                 log.info("ranking day rollover: anchor equity %s", equity)
             positions = await asyncio.to_thread(get_open_positions)
             state.update_positions(positions)

@@ -115,3 +115,16 @@ Review: standing at phase end; abort = the halt floors themselves.
 6. Daily-loss circuit breaker: new entries blocked when ranking-day pnl
    (16:00 UTC anchor) reaches -1.5 USDT. One -2 day costs ~1.6 Sharpe units.
 Review: standing at phase end; full audit in memory + task output file.
+
+## Post-sweep batch (2026-08-02, user: ship it)
+1. Fee-viability gate: entries refused when derived TP (0.6 x vol) would floor
+   below MIN_TP_PCT - the floor was silently inverting risk-reward in low vol
+   (Aug 1 boosted trades ran TP 0.15 vs SL 0.163-0.170, breakeven 68%).
+2. Daily-loss breaker anchor persists to data/day_anchor.json - restarts no
+   longer reset the ranking-day loss budget (regression in d20b372, fixed).
+3. MAX_POSITION_AGE 4h -> 1h (trend-entry holds of 60-120min ran 9% winrate,
+   n=11, in-sample caveat); unanimity-boosted trades keep a 2h leash.
+4. PROMPT_HEADER truth rewrite: trend-only rules stated, vol-derived brackets
+   acknowledged (model tp/sl advisory), ~1h force-close disclosed, real fees
+   (0.05%), dead chop-fade language removed. JSON contract unchanged.
+Review: standing at phase end; per-change notes in the sweep results file.

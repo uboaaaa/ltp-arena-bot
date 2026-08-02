@@ -5,6 +5,7 @@ import logging
 from decimal import Decimal
 
 PLAN_PATH = os.path.join("data", "active_plan.json")
+ANCHOR_PATH = os.path.join("data", "day_anchor.json")
 
 class BotState:
     __slots__ = (
@@ -85,7 +86,30 @@ class BotState:
                     "sl_pct" : Decimal(raw["sl_pct"]),
                     "decision_id" : raw.get("decision_id"),
                     "opened_at" : float(raw.get("opened_at", 0)),
-                    "side" : raw.get("side")
+                    "side" : raw.get("side"),
+                    "boosted" : raw.get("boosted") in (True, "True")
                 }
         except Exception:
             logging.getLogger("bot.state").exception("failed to load persisted plan")
+
+    def persist_day_anchor(self) -> None:
+        """ Mirror the ranking-day loss anchor to disk so restarts cannot reset the breaker """
+        try:
+            os.makedirs("data", exist_ok=True)
+            with open(ANCHOR_PATH, "w") as f:
+                json.dump({"ranking_day" : self.ranking_day,
+                           "day_start_equity" : str(self.day_start_equity)}, f)
+        except Exception:
+            logging.getLogger("bot.state").exception("failed to persist day anchor")
+
+    def load_day_anchor(self, current_day: int) -> None:
+        """ Restore the anchor after a restart, but only for the SAME ranking day """
+        try:
+            if os.path.exists(ANCHOR_PATH):
+                with open(ANCHOR_PATH) as f:
+                    raw = json.load(f)
+                if raw.get("ranking_day") == current_day:
+                    self.ranking_day = current_day
+                    self.day_start_equity = Decimal(raw["day_start_equity"])
+        except Exception:
+            logging.getLogger("bot.state").exception("failed to load day anchor")
