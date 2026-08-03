@@ -56,7 +56,7 @@ EXIT_VOTE_CALLS = 2
 EXIT_VOTES_NEEDED = 2
 
 # --- audit tier-1 (2026-08-02, see docs/experiments.md) ---
-DAILY_LOSS_LIMIT = Decimal("1.5")   # block new entries when ranking-day pnl (16:00 UTC anchor) is below -this
+DAILY_LOSS_LIMIT = Decimal("2.5")  # 2026-08-03: recalibrated to ~2 boosted stops after size escalation   # block new entries when ranking-day pnl (16:00 UTC anchor) is below -this
 TREND_SCAN_INTERVAL = 150           # faster decision cadence while FLAT in a trending regime
 
 # --- unanimity sizing: unanimous 3-of-3 entry vote + catalyst doubles size ---
