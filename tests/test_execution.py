@@ -86,15 +86,15 @@ def test_size_returns_none_without_conviction():
     assert size_order(Decimal("1000"), 0.5, Decimal("65000"), Decimal("0.001"), Decimal("50")) is None
 
 def test_size_full_conviction_btc():
-    # 1000 * 0.25 * 1.0 = 250 target
-    # 250 / 65000 = 0.00384 -> snap up to 0.004
+    # max throttle: 1000 * 0.5 * 1.0 = 500 target
+    # 500 / 65000 = 0.00769 -> snap up to 0.008
     qty = size_order(Decimal("1000"), 0.9, Decimal("65000"), Decimal("0.001"), Decimal("50"))
-    assert qty == Decimal("0.004")
+    assert qty == Decimal("0.008")
 
 def test_size_mid_confidence_now_full():
-    # flattened tiers: 1000 * 0.25 * 1.0 = 250 target -> 0.004
+    # flattened tiers: 1000 * 0.5 * 1.0 = 500 target -> 0.008
     qty = size_order(Decimal("1000"), 0.7, Decimal("65000"), Decimal("0.001"), Decimal("50"))
-    assert qty == Decimal("0.004")
+    assert qty == Decimal("0.008")
 
 def test_size_bump_up_to_min_notional(monkeypatch):
     # mechanism test at the original 0.08 fraction: target 40 < min_notional 50,

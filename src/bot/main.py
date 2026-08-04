@@ -184,7 +184,7 @@ async def strategy_loop(state: BotState) -> None:
                 if (chg_12h is not None and abs(chg_12h) >= CHOP_THRESHOLD_PCT
                         and current_stance(state.open_positions, active_symbol) == "FLAT"):
                     sleep_for = TREND_SCAN_INTERVAL   # scan faster while flat in a trending market
-                sym_name = "ETH" if "ETH" in active_symbol else "BTC"
+                sym_name = active_symbol.split("_")[2]   # BINANCE_PERP_SOL_USDT -> SOL
                 prompt = build_prompt(ticker, klines, funding, headlines, state, klines_5m, sym_name)
                 raw = await asyncio.to_thread(ask_llm, prompt)
                 decision = parse_llm_decision(raw)

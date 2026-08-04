@@ -157,3 +157,12 @@ Max-age reverted 1h -> 2h: the 1h leash's live record was 8 timeouts / 1 win
 of pure fee churn in slow-grind markets; the in-sample +1.9 never materialized.
 Review: standing at phase end - ETH trades graded against BTC trades by the
 analyzer (symbol is in every order result and plan).
+
+## Max throttle + SOL (2026-08-04, user conditional: ship only if top-30 plausible - it is, barely)
+BASE_POSITION_FRACTION 0.25 -> 0.5; leverage set and VERIFIED at 2 on BTC/ETH/SOL
+(competition cap, fully used); DAILY_LOSS_LIMIT 2.5 -> 5.0 (~1 boosted stop + 1 base
+stop of daily room); SOL added to scan list. Base trade ~USD 490, boosted ~USD 980.
+Ordinary win ~+2.4, ordinary stop ~-2.1, boosted stop ~-4.2, ratchet runner 10-20.
+Honest odds stated: ~1 in 10 with cooperative weather; at previous throttle the
+16-point composite gap was not plausibly closable. Compliance reconstruction
+explicitly SKIPPED by user directive (on record). Review: phase end.

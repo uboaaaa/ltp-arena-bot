@@ -3,7 +3,7 @@
 from decimal import Decimal
 
 SYMBOL = "BINANCE_PERP_BTC_USDT"
-SYMBOLS = [SYMBOL, "BINANCE_PERP_ETH_USDT"]  # scan list: one position at a time, rotate when flat
+SYMBOLS = [SYMBOL, "BINANCE_PERP_ETH_USDT", "BINANCE_PERP_SOL_USDT"]  # scan list: one position at a time, rotate when flat
 
 # --- intervals  ---
 RISK_INTERVAL = 10
@@ -37,7 +37,7 @@ BRACKET_COOLDOWN_SECONDS = 30
 REQUIRE_CONFIRMATION = False
 
 # --- execution ---
-BASE_POSITION_FRACTION = Decimal("0.25") # 2026-08-01 size escalation: tournament variance play, see docs/experiments.md
+BASE_POSITION_FRACTION = Decimal("0.5")  # 2026-08-04 MAX THROTTLE: final legal setting, 2x leverage verified on all symbols
 CONF_FLOOR = 0.6
 CONF_FULL = 0.8
 MIN_HOLD_SECONDS = 900
@@ -57,7 +57,7 @@ EXIT_VOTE_CALLS = 2
 EXIT_VOTES_NEEDED = 2
 
 # --- audit tier-1 (2026-08-02, see docs/experiments.md) ---
-DAILY_LOSS_LIMIT = Decimal("2.5")  # 2026-08-03: recalibrated to ~2 boosted stops after size escalation   # block new entries when ranking-day pnl (16:00 UTC anchor) is below -this
+DAILY_LOSS_LIMIT = Decimal("5.0")  # 2026-08-04: max throttle needs ~1 boosted stop + 1 base stop of room per day   # block new entries when ranking-day pnl (16:00 UTC anchor) is below -this
 TREND_SCAN_INTERVAL = 150           # faster decision cadence while FLAT in a trending regime
 
 # --- unanimity sizing: unanimous 3-of-3 entry vote + catalyst doubles size ---

@@ -44,7 +44,7 @@ When you choose LONG or SHORT you must still provide take_profit_pct and stop_lo
 are advisory: the live exit brackets are derived from measured volatility (take profit about 0.6x \
 and stop loss about 0.7x the recent average hourly range), and your values are used only as a \
 fallback when volatility data is missing, so keep them sensible for the setup you describe. Two \
-hard constraints should shape which trades you propose: every position is force-closed after about 1 hour \
+hard constraints should shape which trades you propose: every position is force-closed after about 2 hours \
 old, so only take setups you expect to resolve fast, and round-trip fees cost about \
 0.05 percent, so the expected move must be worth meaningfully more than that.
 
