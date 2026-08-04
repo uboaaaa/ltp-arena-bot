@@ -339,6 +339,8 @@ def test_low_volatility_entry_refused(tmp_path, monkeypatch):
     assert any("fee-viable" in g for g in summary["gate"])
 
 def test_boosted_plan_gets_longer_max_age(tmp_path, monkeypatch):
+    # mechanism test: pin the normal cap below the boosted cap
+    monkeypatch.setattr(ex, "MAX_POSITION_AGE_SECONDS", 3600)
     import time as _t
     row = {"sym": "BINANCE_PERP_BTC_USDT", "positionQty": "0.001",
            "avgPrice": "64000", "markPrice": "64000"}
@@ -388,3 +390,31 @@ def test_boosted_pre_arm_stop_still_works(tmp_path, monkeypatch):
     state = _boosted_state(tmp_path, monkeypatch, "63740")   # -0.41% below sl
     trigger = ex.check_bracket(state)
     assert trigger is not None and trigger[0] == "stop_loss"
+
+
+# symbol rotation tests
+
+def test_current_stance_filters_by_symbol():
+    rows = [{"sym": "BINANCE_PERP_ETH_USDT", "positionQty": "0.01"}]
+    assert ex.current_stance(rows, "BINANCE_PERP_ETH_USDT") == "LONG"
+    assert ex.current_stance(rows) == "FLAT"                      # default = BTC, unaffected
+
+def test_check_bracket_uses_plan_symbol(tmp_path, monkeypatch):
+    import time as _t
+    state = _mk_state(tmp_path, monkeypatch)
+    state.update_positions([{"sym": "BINANCE_PERP_ETH_USDT", "positionQty": "0.01",
+                             "avgPrice": "1900", "markPrice": "1880"}])
+    state.set_plan({"tp_pct": Decimal("0.5"), "sl_pct": Decimal("0.5"),
+                    "opened_at": _t.time() - 60, "side": "LONG",
+                    "symbol": "BINANCE_PERP_ETH_USDT"})
+    trigger = ex.check_bracket(state)                               # -1.05% < -0.5% sl
+    assert trigger is not None and trigger[0] == "stop_loss"
+
+def test_execute_decision_stamps_symbol(tmp_path, monkeypatch):
+    state = _mk_state(tmp_path, monkeypatch)
+    calls = _mock_broker(monkeypatch, "BUY")
+    ex.execute_decision(state, dict(DECISION_LONG), "d-eth-1",
+                        vol_pct=Decimal("0.5"), chg_12h=Decimal("1.2"),
+                        symbol="BINANCE_PERP_ETH_USDT")
+    assert calls["placed"][0]["symbol"] == "BINANCE_PERP_ETH_USDT"
+    assert state.active_plan["symbol"] == "BINANCE_PERP_ETH_USDT"

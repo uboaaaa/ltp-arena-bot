@@ -143,3 +143,17 @@ flat stance, conf>=0.6, 45-min dedupe, 15m candles pessimistic): n=6 over
 the whole phase, 3 TP / 0 SL / 3 age-outs, net +0.10% total. The earlier
 6-of-8 figure was hindsight-selected on days that became trends. Not worth
 prompt+gate complexity; re-examine only if trend days prove scarcer still.
+
+## ETH rotation + max-age revert (2026-08-04, user: ship ETH / stop the bleeding)
+Rotation: SYMBOLS = [BTC, ETH]; when flat, each cycle scans both and runs the
+normal single-symbol pipeline on the one with the larger |12h| change; when
+holding, only the held symbol is watched. One position at a time, ever. Plans
+carry their symbol and survive restarts. ETH leverage verified set to 1
+(default was 5; competition cap 2) BEFORE the code shipped. Model-call budget
+unchanged (still one decision per cycle). Basis: ETH trends ~25% more often
+and moves ~42% more per hour (audit-verified); this roughly doubles hunting
+days for the same signal.
+Max-age reverted 1h -> 2h: the 1h leash's live record was 8 timeouts / 1 win
+of pure fee churn in slow-grind markets; the in-sample +1.9 never materialized.
+Review: standing at phase end - ETH trades graded against BTC trades by the
+analyzer (symbol is in every order result and plan).

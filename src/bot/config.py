@@ -3,6 +3,7 @@
 from decimal import Decimal
 
 SYMBOL = "BINANCE_PERP_BTC_USDT"
+SYMBOLS = [SYMBOL, "BINANCE_PERP_ETH_USDT"]  # scan list: one position at a time, rotate when flat
 
 # --- intervals  ---
 RISK_INTERVAL = 10
@@ -29,7 +30,7 @@ MIN_SL_PCT = Decimal("0.15")
 MAX_SL_PCT = Decimal("1.5")
 DEFAULT_TP_PCT = Decimal("0.6")
 DEFAULT_SL_PCT = Decimal("0.4")
-MAX_POSITION_AGE_SECONDS = 3600            # sweep 2026-08-02: 60-120min hold zone ran 9% winrate
+MAX_POSITION_AGE_SECONDS = 7200            # 2026-08-04: 1h leash produced pure fee churn live (8 timeouts/1 win); reverted to 2h
 MAX_POSITION_AGE_BOOSTED_SECONDS = 7200    # boosted trades keep a longer leash
 RATCHET_FLOOR_PCT = Decimal("0.08")        # once the ratchet arms, never exit below fees+slippage
 BRACKET_COOLDOWN_SECONDS = 30

@@ -56,10 +56,10 @@ log = logging.getLogger("bot.execution")
 TERMINAL_STATES = ("FILLED", "CANCELLED", "REJECTED", "EXPIRED")
 
 # --- logic ---
-def current_stance(open_positions: list) -> str:
+def current_stance(open_positions: list, symbol: str = SYMBOL) -> str:
     """ 'LONG', 'SHORT', or 'FLAT' from live position rows (NET mode: signed qty). """
     for row in open_positions:
-        if row.get("sym") == SYMBOL:
+        if row.get("sym") == symbol:
             qty = Decimal(str(row.get("positionQty", "0")))
             if qty > 0:
                 return "LONG"
@@ -132,7 +132,8 @@ def gate_check(state, transition: str) -> list[str]:
 
 def check_bracket(state) -> tuple[str, Decimal] | None:
     """ Return (trigger, pnl_pct) if the open position has hit its plan """
-    rows = [r for r in state.open_positions if r.get('sym') == SYMBOL]
+    plan_sym = (state.active_plan or {}).get("symbol") or SYMBOL
+    rows = [r for r in state.open_positions if r.get('sym') == plan_sym]
     if not rows:
         return None
     row = rows[0]
@@ -182,7 +183,8 @@ def check_bracket(state) -> tuple[str, Decimal] | None:
 def handle_bracket_exit(state, trigger) -> dict:
     """ Close position for a fired bracket, journal it, then update cooldowns. Money first, record second, bookkeeping last. If the close raises, state is untouched and the next risk cycle retries """
     reason, pnl_pct = trigger
-    result = close_position(SYMBOL, str(state.equity or 1000))
+    plan_sym = (state.active_plan or {}).get("symbol") or SYMBOL
+    result = close_position(plan_sym, str(state.equity or 1000))
     record = {
         "event" : "bracket_exit",
         "trigger" : reason,
@@ -203,7 +205,8 @@ def handle_bracket_exit(state, trigger) -> dict:
 def handle_model_exit(state, votes: list) -> dict:
     """ Close the position because a majority of sampled model opinions voted to be out. Similar to handle_bracket_exit. Voluntary exits do not kick off the stop cooldown """
     pnl_pct = None
-    rows = [r for r in state.open_positions if r.get("sym") == SYMBOL]
+    plan_sym = (state.active_plan or {}).get("symbol") or SYMBOL
+    rows = [r for r in state.open_positions if r.get("sym") == plan_sym]
     if rows:
         qty = Decimal(str(rows[0].get("positionQty", "0")))
         avg = Decimal(str(rows[0].get("avgPrice", "0")))
@@ -213,7 +216,7 @@ def handle_model_exit(state, votes: list) -> dict:
             pnl_pct = (mark - avg) / avg * Decimal("100") * direction
     
     try:
-        result = close_position(SYMBOL, str(state.equity or 1000))
+        result = close_position(plan_sym, str(state.equity or 1000))
     except Exception as e:
         if "RCLI24003" in str(e) or "NO_POSITION" in str(e):
             # bracket close won the race - position already flat; record and move on
@@ -325,9 +328,9 @@ def _wait_terminal(client_order_id: str, tries: int=10) -> dict:
             return order_state
     return order_state
 
-def _open(side, qty, price_cap, state, decision, decision_id) -> dict:
+def _open(side, qty, price_cap, state, decision, decision_id, symbol: str = SYMBOL) -> dict:
     order = {
-        "symbol" : SYMBOL,
+        "symbol" : symbol,
         "side" : side,
         "positionSide" : "LONG" if side == "BUY" else "SHORT",
         "orderType" : "LIMIT",
@@ -348,11 +351,12 @@ def _open(side, qty, price_cap, state, decision, decision_id) -> dict:
             "decision_id" : decision_id,
             "opened_at" : time.time(),
             "side" : "LONG" if side=="BUY" else "SHORT",
+            "symbol" : symbol,
         })
     log.info("EXECUTE result: state=%s  filled=%s  avg=%s", result.get("orderState"), result.get("executedQty"), result.get("executedAvgPrice"))
     return result
 
-def execute_decision(state, decision: dict, decision_id, vol_pct=None, chg_12h=None, range_pos=None, size_mult=Decimal("1")) -> dict:
+def execute_decision(state, decision: dict, decision_id, vol_pct=None, chg_12h=None, range_pos=None, size_mult=Decimal("1"), symbol: str = SYMBOL) -> dict:
     """ FULL PIPELINE: stance -> transition -> gate -> orders.
     Retuns summary dict for reasoning logs """
     summary = {"decision" : decision, "transition" : None, "gate" : [], "orders" : []}
@@ -414,18 +418,18 @@ def execute_decision(state, decision: dict, decision_id, vol_pct=None, chg_12h=N
         log.info("EXECUTE gated: %s", "; ".join(reasons))
         return summary
     
-    info = get_symbol_info(SYMBOL)
+    info = get_symbol_info(symbol)
     tick = Decimal(str(info["tickSize"]))
     lot = Decimal(str(info["lotSize"]))
     min_notional = Decimal(str(info["minNotional"]))
-    last = Decimal(str(get_ticker(SYMBOL)["lastPrice"]))
+    last = Decimal(str(get_ticker(symbol)["lastPrice"]))
 
     if transition in ("CLOSE", "CLOSE_THEN_LONG", "CLOSE_THEN_SHORT"):
         cap = str(state.equity or Decimal("1000"))
         log.info("EXECUTE close position (maxNotional cap %s)", cap)
         summary["orders"].append({
             "type" : "close",
-            "result" : close_position(SYMBOL, cap)
+            "result" : close_position(symbol, cap)
         })
         state.set_plan(None)
         state.last_write_at = time.time()
@@ -451,13 +455,13 @@ def execute_decision(state, decision: dict, decision_id, vol_pct=None, chg_12h=N
             cap = snap_down(last * Decimal("1.002"), tick)
             summary["orders"].append({
                 "type" : "open_long",
-                "result" : _open("BUY", qty, cap, state, decision, decision_id)
+                "result" : _open("BUY", qty, cap, state, decision, decision_id, symbol)
             })
         else:
             cap = snap_up(last * Decimal("0.998"), tick)
             summary["orders"].append({
                 "type" : "open_short",
-                "result" : _open("SELL", qty, cap, state, decision, decision_id)
+                "result" : _open("SELL", qty, cap, state, decision, decision_id, symbol)
             })
         if "size_mult" in summary and state.active_plan:
             plan = dict(state.active_plan)

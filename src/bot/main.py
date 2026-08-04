@@ -3,6 +3,7 @@ Run using: python3 -m bot.main (from src/) """
 
 import asyncio
 import json
+from decimal import Decimal
 import logging
 import time
 
@@ -20,6 +21,7 @@ from bot.config import (
     RISK_INTERVAL,
     STRATEGY_INTERVAL,
     SYMBOL,
+    SYMBOLS,
     EXIT_VOTE_CALLS,
     EXIT_VOTES_NEEDED,
     ENTRY_VOTE_ENABLED,
@@ -148,13 +150,28 @@ async def strategy_loop(state: BotState) -> None:
             if state.halted:
                 log.info("strategy: halted (%s). observing only", state.halt_reason)
             else:
-                ticker = await asyncio.to_thread(get_ticker, SYMBOL)
-                klines = await asyncio.to_thread(get_klines, SYMBOL)
-                klines_5m = await asyncio.to_thread(get_klines, SYMBOL, "5m", 12)
+                plan_now = state.active_plan or {}
+                held_sym = plan_now.get("symbol") or SYMBOL
+                if current_stance(state.open_positions, held_sym) != "FLAT":
+                    active_symbol = held_sym
+                    klines = await asyncio.to_thread(get_klines, active_symbol)
+                else:
+                    active_symbol, klines, best_chg = SYMBOL, None, None
+                    for scan_sym in SYMBOLS:
+                        k = await asyncio.to_thread(get_klines, scan_sym)
+                        c = change_12h_pct(k)
+                        if c is not None and (best_chg is None or abs(c) > abs(best_chg)):
+                            active_symbol, klines, best_chg = scan_sym, k, c
+                    if klines is None:
+                        klines = await asyncio.to_thread(get_klines, SYMBOL)
+                    if active_symbol != SYMBOL:
+                        log.info("scan: %s selected (12h %+.2f%%)", active_symbol, best_chg)
+                ticker = await asyncio.to_thread(get_ticker, active_symbol)
+                klines_5m = await asyncio.to_thread(get_klines, active_symbol, "5m", 12)
                 range_pos = ticker_range_position_pct(ticker)
                 vol_pct = avg_hourly_range_pct(klines)
                 chg_12h = change_12h_pct(klines)
-                funding = await asyncio.to_thread(get_funding_rate, SYMBOL)
+                funding = await asyncio.to_thread(get_funding_rate, active_symbol)
 
                 try:
                     headlines = await asyncio.to_thread(sosovalue.get_recent_headlines)
@@ -165,9 +182,10 @@ async def strategy_loop(state: BotState) -> None:
                     headlines = []
 
                 if (chg_12h is not None and abs(chg_12h) >= CHOP_THRESHOLD_PCT
-                        and current_stance(state.open_positions) == "FLAT"):
+                        and current_stance(state.open_positions, active_symbol) == "FLAT"):
                     sleep_for = TREND_SCAN_INTERVAL   # scan faster while flat in a trending market
-                prompt = build_prompt(ticker, klines, funding, headlines, state, klines_5m)
+                sym_name = "ETH" if "ETH" in active_symbol else "BTC"
+                prompt = build_prompt(ticker, klines, funding, headlines, state, klines_5m, sym_name)
                 raw = await asyncio.to_thread(ask_llm, prompt)
                 decision = parse_llm_decision(raw)
                 decision_id = f"d-{int(time.time() * 1000)}"
@@ -186,7 +204,7 @@ async def strategy_loop(state: BotState) -> None:
                 else:
                     state.update_decision(decision)
                     log.info("strategy: decision=%s   conf=%f   reason=%s", decision['action'], decision['confidence'], decision['reasoning'])
-                    stance = current_stance(state.open_positions)
+                    stance = current_stance(state.open_positions, active_symbol)
                     if EXECUTION_ENABLED and should_call_exit_vote(stance, decision) and not (state.active_plan or {}).get("ratchet_armed"):
                         votes = [decision]
                         for _ in range(EXIT_VOTE_CALLS):
@@ -216,9 +234,9 @@ async def strategy_loop(state: BotState) -> None:
                             boost = UNANIMITY_SIZE_MULT if (tally == 3 and len(votes) == 3 and any(v.get("catalyst") is True for v in votes)) else None
                             log.info("ENTRY vote passed (%d of %d): proceeding with %s%s", tally, len(votes), decision["action"], " [UNANIMITY BOOST]" if boost else "")
                             if boost:
-                                result = await asyncio.to_thread(execute_decision, state, decision, decision_id, vol_pct, chg_12h, range_pos, boost)
+                                result = await asyncio.to_thread(execute_decision, state, decision, decision_id, vol_pct, chg_12h, range_pos, boost, active_symbol)
                             else:
-                                result = await asyncio.to_thread(execute_decision, state, decision, decision_id, vol_pct, chg_12h, range_pos)
+                                result = await asyncio.to_thread(execute_decision, state, decision, decision_id, vol_pct, chg_12h, range_pos, Decimal("1"), active_symbol)
                             entry["execution"] = result
                             log.info("execution summary: %s", json.dumps(result, default=str))
                         else:
@@ -226,7 +244,7 @@ async def strategy_loop(state: BotState) -> None:
                             entry["execution"] = {"transition" : "ENTRY_VOTE_FAIL", "votes_for" : tally}
 
                     elif EXECUTION_ENABLED:
-                        result = await asyncio.to_thread(execute_decision, state, decision, decision_id, vol_pct, chg_12h, range_pos)
+                        result = await asyncio.to_thread(execute_decision, state, decision, decision_id, vol_pct, chg_12h, range_pos, Decimal("1"), active_symbol)
                         entry["execution"] = result
                         log.info("execution summary: %s", json.dumps(result, default=str))
                     else:

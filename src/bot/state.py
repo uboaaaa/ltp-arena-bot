@@ -87,6 +87,7 @@ class BotState:
                     "decision_id" : raw.get("decision_id"),
                     "opened_at" : float(raw.get("opened_at", 0)),
                     "side" : raw.get("side"),
+                    "symbol" : raw.get("symbol"),
                     "boosted" : raw.get("boosted") in (True, "True"),
                     "ratchet_armed" : raw.get("ratchet_armed") in (True, "True"),
                     "peak_pnl" : Decimal(raw["peak_pnl"]) if raw.get("peak_pnl") not in (None, "None") else None

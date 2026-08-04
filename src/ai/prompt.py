@@ -82,7 +82,7 @@ def summarize_recent_5m(klines_response) -> str:
         f"last 60 min change {change:+.2f}%, 5-minute closes: "
         + " ".join(f"{c:.0f}" for c in closes)
     )
-def build_prompt(ticker: dict, klines_response, funding_rows, headlines, state, klines_5m=None) -> str:
+def build_prompt(ticker: dict, klines_response, funding_rows, headlines, state, klines_5m=None, symbol_name="BTC") -> str:
     """ assembles full decision prompt from collated market data """
     funding = funding_rows[0]["fundingRate"] if funding_rows else "unknown"
     evidence = [
@@ -98,7 +98,7 @@ def build_prompt(ticker: dict, klines_response, funding_rows, headlines, state, 
         evidence.append(f"- {summarize_recent_5m(klines_5m)}")
 
     evidence.append(f"- our stance: {describe_stance(state)}")
-    return f"{PROMPT_HEADER}\nCurrent evidence for BTC perpetual:\n" + "\n".join(evidence)
+    return f"{PROMPT_HEADER}\nCurrent evidence for {symbol_name} perpetual:\n" + "\n".join(evidence)
 
 def describe_stance(state) -> str:
     """ One-liner explaining the position we're holding to the model so it doesn't have to guess. Positive PnL means trade is winning for longs and shorts alike """
