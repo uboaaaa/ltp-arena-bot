@@ -3,7 +3,6 @@ from decimal import Decimal
 
 from bot.config import (
     SYMBOL, 
-    MAX_POSITION_AGE_SECONDS,
 )
 
 from bot.execution import (
@@ -212,16 +211,6 @@ def test_bracket_stop_loss_on_short():
     trigger, pnl_pct = check_bracket(state)
     assert trigger == "stop_loss"
     assert pnl_pct < 0
-
-def test_bracket_max_age_closes_a_quiet_position():
-    old = _plan(opened_at=time.time() - (MAX_POSITION_AGE_SECONDS + 10))
-    state = FakeState(open_positions=[_position("0.001", 65000, 65050)], active_plan=old)
-    trigger, _ = check_bracket(state)
-    assert trigger == "max_age"
-
-
-# debounce
-# these only exercise paths that return before any network call
 
 DECISION = {"action": "LONG", "confidence": 0.7, "reasoning": "test",
             "take_profit_pct": Decimal("0.6"), "stop_loss_pct": Decimal("0.4")}

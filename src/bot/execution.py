@@ -17,8 +17,6 @@ from bot.config import (
     DEFAULT_SL_PCT,
     DEFAULT_TP_PCT,
     MAX_EQUITY_AGE,
-    MAX_POSITION_AGE_SECONDS,
-    MAX_POSITION_AGE_BOOSTED_SECONDS,
     RATCHET_FLOOR_PCT,
     MIN_HOLD_SECONDS,
     REQUIRE_CONFIRMATION,
@@ -149,7 +147,6 @@ def check_bracket(state) -> tuple[str, Decimal] | None:
     plan = state.active_plan or {}
     tp = plan.get("tp_pct", DEFAULT_TP_PCT)
     sl = plan.get("sl_pct", DEFAULT_SL_PCT)
-    opened_at = plan.get("opened_at", 0.0)
 
     if plan.get("boosted"):
         # boosted trades trade their fixed take-profit for a trailing ratchet:
@@ -167,16 +164,12 @@ def check_bracket(state) -> tuple[str, Decimal] | None:
                 return ("trail_stop", pnl_pct)
         elif pnl_pct <= -sl:
             return ("stop_loss", pnl_pct)
-        if opened_at and time.time() - opened_at > MAX_POSITION_AGE_BOOSTED_SECONDS:
-            return ("max_age", pnl_pct)
         return None
 
     if pnl_pct >= tp:
         return ("take_profit", pnl_pct)
     if pnl_pct <= -sl:
         return ("stop_loss", pnl_pct)
-    if opened_at and time.time() - opened_at > MAX_POSITION_AGE_SECONDS:
-        return ("max_age", pnl_pct)
     
     return None
 

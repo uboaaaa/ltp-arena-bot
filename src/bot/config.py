@@ -30,8 +30,9 @@ MIN_SL_PCT = Decimal("0.15")
 MAX_SL_PCT = Decimal("1.5")
 DEFAULT_TP_PCT = Decimal("0.6")
 DEFAULT_SL_PCT = Decimal("0.4")
-MAX_POSITION_AGE_SECONDS = 7200            # 2026-08-04: 1h leash produced pure fee churn live (8 timeouts/1 win); reverted to 2h
-MAX_POSITION_AGE_BOOSTED_SECONDS = 7200    # boosted trades keep a longer leash
+# MAX_POSITION_AGE removed 2026-08-05: time limits killed the runners the ratchet
+# exists to ride (T.Anh evidence: multi-day holds are the one working method in
+# this market). Positions end at the stop, the trail, or an exit vote - not a clock.
 RATCHET_FLOOR_PCT = Decimal("0.08")        # once the ratchet arms, never exit below fees+slippage
 BRACKET_COOLDOWN_SECONDS = 30
 REQUIRE_CONFIRMATION = False

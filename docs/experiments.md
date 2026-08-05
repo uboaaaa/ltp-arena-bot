@@ -166,3 +166,14 @@ Ordinary win ~+2.4, ordinary stop ~-2.1, boosted stop ~-4.2, ratchet runner 10-2
 Honest odds stated: ~1 in 10 with cooperative weather; at previous throttle the
 16-point composite gap was not plausibly closable. Compliance reconstruction
 explicitly SKIPPED by user directive (on record). Review: phase end.
+
+## Time limit removed (2026-08-05, user directive)
+MAX_POSITION_AGE deleted entirely (was 4h -> 1h -> 2h across its life).
+Positions now end only at the stop, the trailing ratchet, or an exit vote.
+Rationale: the limit's own record - 13 lifetime timeout exits netting ~zero,
+the 1h version proven fee churn, the death-zone stats revealed as in-sample
+noise - plus the T.Anh observation (only currently-winning team holds
+positions for days; +15 USD in a week on zero new trades). The limit made
+ratchet runners structurally impossible. Risk accepted: stagnant positions
+can block the single trading slot; the exit vote and 5-min re-evaluation
+are the remaining slot-clearing mechanisms.

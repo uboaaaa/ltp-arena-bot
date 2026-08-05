@@ -140,14 +140,6 @@ def test_bracket_exit_stop_loss_arms_cooldown(tmp_path, monkeypatch):
     assert state.last_stop_at > 0             # revenge-trading brake engaged
 
 
-def test_bracket_exit_max_age_is_a_calm_exit(tmp_path, monkeypatch):
-    state = _mk_plan_state(tmp_path, monkeypatch)
-    monkeypatch.setattr(ex, "close_position", lambda sym, mn: {"ok": True})
-    monkeypatch.setattr(ex.journal, "record", lambda r: None)
-    ex.handle_bracket_exit(state, ("max_age", Decimal("-0.05")))
-    assert state.last_stop_at == 0.0          # timeouts are not punished
-
-
 def test_bracket_exit_close_failure_preserves_state(tmp_path, monkeypatch):
     state = _mk_plan_state(tmp_path, monkeypatch)
     records = []
@@ -337,26 +329,6 @@ def test_low_volatility_entry_refused(tmp_path, monkeypatch):
                                   vol_pct=Decimal("0.2"), chg_12h=Decimal("1.2"))
     assert calls["placed"] == []
     assert any("fee-viable" in g for g in summary["gate"])
-
-def test_boosted_plan_gets_longer_max_age(tmp_path, monkeypatch):
-    # mechanism test: pin the normal cap below the boosted cap
-    monkeypatch.setattr(ex, "MAX_POSITION_AGE_SECONDS", 3600)
-    import time as _t
-    row = {"sym": "BINANCE_PERP_BTC_USDT", "positionQty": "0.001",
-           "avgPrice": "64000", "markPrice": "64000"}
-    plan = {"tp_pct": Decimal("5"), "sl_pct": Decimal("5"),
-            "opened_at": _t.time() - 5000, "side": "LONG", "boosted": True}
-    state = _mk_state(tmp_path, monkeypatch)
-    state.update_positions([row])
-    state.set_plan(plan)
-    assert ex.check_bracket(state) is None          # 5000s < 7200s boosted leash
-    plan2 = dict(plan, boosted=False)
-    state.set_plan(plan2)
-    trigger = ex.check_bracket(state)
-    assert trigger is not None and trigger[0] == "max_age"   # 5000s > 3600s normal cap
-
-
-# trailing ratchet tests
 
 def _boosted_state(tmp_path, monkeypatch, mark, peak=None, armed=False):
     import time as _t
