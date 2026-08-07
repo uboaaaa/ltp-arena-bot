@@ -11,8 +11,8 @@ STRATEGY_INTERVAL = 300
 HEARTBEAT_INTERVAL = 60
 
 # --- risk thresholds (USDT equity) ---
-SOFT_HALT_EQUITY = Decimal("965")
-HARD_FLATTEN_EQUITY = Decimal("955")
+SOFT_HALT_EQUITY = Decimal("850")  # 2026-08-07 user directive: use every trading day; breaker (-5/day) cannot reach this before phase end
+HARD_FLATTEN_EQUITY = Decimal("825") # elimination insurance only (elimination at 800)
 
 # --- master switch ---
 EXECUTION_ENABLED = True # "True" means orders actually execute. will turn to True during competition period
@@ -54,8 +54,8 @@ CHOP_CONF_FLOOR = 1.01 # trend-only mode 2026-08-01: unreachable bar = NO entrie
 
 # --- bot exit confidence ---
 EXIT_CONF = 0.65
-EXIT_VOTE_CALLS = 2
-EXIT_VOTES_NEEDED = 2
+EXIT_VOTE_CALLS = 0     # review 2: lone exit signals were right 10/14; confirmation added delay, not accuracy
+EXIT_VOTES_NEEDED = 1   # first qualifying exit opinion closes immediately
 
 # --- audit tier-1 (2026-08-02, see docs/experiments.md) ---
 DAILY_LOSS_LIMIT = Decimal("5.0")  # 2026-08-04: max throttle needs ~1 boosted stop + 1 base stop of room per day   # block new entries when ranking-day pnl (16:00 UTC anchor) is below -this

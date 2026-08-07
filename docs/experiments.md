@@ -177,3 +177,17 @@ positions for days; +15 USD in a week on zero new trades). The limit made
 ratchet runners structurally impossible. Risk accepted: stagnant positions
 can block the single trading slot; the exit vote and 5-min re-evaluation
 are the remaining slot-clearing mechanisms.
+
+### Exit-vote review 2 (2026-08-07, at 30+ fired votes) + floors drop
+Counterfactual: 13 of 14 recent passed votes BEAT the bracket alternative
+(cumulative +1.9%); the vote consistently cuts losers at roughly half the
+full stop. Mechanism KEPT and STRENGTHENED per the tracked review-1 question:
+lone minority opinions were right 10/14 across both reviews (net ~+1.1%),
+so confirmation sampling is removed - EXIT_VOTE_CALLS 0, EXIT_VOTES_NEEDED 1:
+the first exit opinion at conf >= 0.65 closes the position immediately.
+Saves 2 LLM calls per event and exits earlier, which the counterfactuals
+consistently reward in this regime.
+Floors dropped 965/955 -> 850/825 (user directive: trade every remaining
+day). Arithmetic: daily breaker caps losses at 5/day x 14 days = max -70
+from equity 970, so the floors are unreachable before Aug 21 and now serve
+only as elimination insurance (800). MDD tier already broke 100 -> 90.
