@@ -353,13 +353,22 @@ def execute_decision(state, decision: dict, decision_id, vol_pct=None, chg_12h=N
     """ FULL PIPELINE: stance -> transition -> gate -> orders.
     Retuns summary dict for reasoning logs """
     summary = {"decision" : decision, "transition" : None, "gate" : [], "orders" : []}
-    stance = current_stance(state.open_positions)
+    stance = current_stance(state.open_positions, symbol)
     transition = decide_transition(stance, decision["action"], decision["confidence"])
     summary["transition"] = f"{stance} -> {transition}"
     log.info("EXECUTE transition: %s (conf %.2f)", summary["transition"], decision["confidence"])
 
     if transition in ("NONE", "HOLD"):
         return summary
+
+    if transition.startswith(("OPEN", "CLOSE_THEN")):
+        others = [r.get("sym") for r in state.open_positions
+                  if r.get("sym") != symbol and Decimal(str(r.get("positionQty", "0"))) != 0]
+        if others:
+            reason = f"one-position invariant: {others[0]} is already open"
+            summary["gate"] = [reason]
+            log.info("EXECUTE gated: %s", reason)
+            return summary
     
     if transition.startswith(("OPEN", "CLOSE_THEN")) and (chg_12h is None or vol_pct is None):
         reason = "missing market data (12h change or volatility): refusing entry"

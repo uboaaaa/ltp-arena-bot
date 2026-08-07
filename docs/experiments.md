@@ -191,3 +191,17 @@ Floors dropped 965/955 -> 850/825 (user directive: trade every remaining
 day). Arithmetic: daily breaker caps losses at 5/day x 14 days = max -70
 from equity 970, so the floors are unreachable before Aug 21 and now serve
 only as elimination insurance (800). MDD tier already broke 100 -> 90.
+
+### BUG FIX: position stacking on ETH/SOL (2026-08-07)
+execute_decision computed its stance with current_stance(open_positions) - no
+symbol argument - so it always asked about BTC. While holding SOL or ETH it
+therefore read FLAT and opened ANOTHER position on the same symbol (NET mode
+compounds these into one oversized position). Introduced with the rotation
+build (ffbb252, Aug 4); visible in the journal as consecutive 'FLAT ->
+OPEN_LONG' transitions whose prompts said 'holding a LONG'. Confirmed cases:
+Aug 7 09:27/09:46/10:01 SOL (3 stacked), plus similar ETH runs Aug 5-6.
+Real sizes were therefore up to ~3x intended on those days.
+Fixes: (1) stance is now computed for the traded symbol; (2) NEW one-position
+invariant - any nonzero position on a different symbol refuses the entry
+outright; (3) describe_stance filters by the plan's symbol so the prompt and
+the gate can never disagree again. 3 regression tests added (122 total).

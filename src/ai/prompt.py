@@ -103,7 +103,10 @@ def build_prompt(ticker: dict, klines_response, funding_rows, headlines, state, 
 def describe_stance(state) -> str:
     """ One-liner explaining the position we're holding to the model so it doesn't have to guess. Positive PnL means trade is winning for longs and shorts alike """
     try:
-        row = next((r for r in state.open_positions if Decimal(str(r.get("positionQty", "0"))) != 0), None)
+        plan_sym = (getattr(state, "active_plan", None) or {}).get("symbol")
+        row = next((r for r in state.open_positions
+                    if Decimal(str(r.get("positionQty", "0"))) != 0
+                    and (plan_sym is None or r.get("sym") == plan_sym)), None)
         if row is None:
             return "flat"
         

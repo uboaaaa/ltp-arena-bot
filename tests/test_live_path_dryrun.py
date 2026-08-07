@@ -390,3 +390,37 @@ def test_execute_decision_stamps_symbol(tmp_path, monkeypatch):
                         symbol="BINANCE_PERP_ETH_USDT")
     assert calls["placed"][0]["symbol"] == "BINANCE_PERP_ETH_USDT"
     assert state.active_plan["symbol"] == "BINANCE_PERP_ETH_USDT"
+
+
+# one-position invariant tests (regression: ETH/SOL positions stacked, 2026-08-07)
+
+SOL_SYM = "BINANCE_PERP_SOL_USDT"
+
+def test_holding_sol_blocks_second_sol_entry(tmp_path, monkeypatch):
+    state = _mk_state(tmp_path, monkeypatch)
+    calls = _mock_broker(monkeypatch, "BUY")
+    state.update_positions([{"sym": SOL_SYM, "positionQty": "6.6",
+                             "avgPrice": "73.5", "markPrice": "73.6"}])
+    summary = ex.execute_decision(state, dict(DECISION_LONG), "d-stack-1",
+                                  vol_pct=Decimal("0.5"), chg_12h=Decimal("1.2"),
+                                  symbol=SOL_SYM)
+    assert calls["placed"] == []                 # stance is LONG for SOL -> HOLD, no stacking
+    assert summary["transition"].startswith("LONG")
+
+def test_holding_sol_blocks_entry_on_another_symbol(tmp_path, monkeypatch):
+    state = _mk_state(tmp_path, monkeypatch)
+    calls = _mock_broker(monkeypatch, "BUY")
+    state.update_positions([{"sym": SOL_SYM, "positionQty": "6.6",
+                             "avgPrice": "73.5", "markPrice": "73.6"}])
+    summary = ex.execute_decision(state, dict(DECISION_LONG), "d-stack-2",
+                                  vol_pct=Decimal("0.5"), chg_12h=Decimal("1.2"))
+    assert calls["placed"] == []                 # BTC entry refused while SOL is open
+    assert any("one-position invariant" in g for g in summary["gate"])
+
+def test_flat_still_opens_normally(tmp_path, monkeypatch):
+    state = _mk_state(tmp_path, monkeypatch)
+    calls = _mock_broker(monkeypatch, "BUY")
+    state.update_positions([{"sym": SOL_SYM, "positionQty": "0"}])   # qty 0 = not a position
+    ex.execute_decision(state, dict(DECISION_LONG), "d-stack-3",
+                        vol_pct=Decimal("0.5"), chg_12h=Decimal("1.2"), symbol=SOL_SYM)
+    assert len(calls["placed"]) == 1
