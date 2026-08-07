@@ -144,7 +144,10 @@ def test_gate_blocks_on_stale_equity():
     reasons = gate_check(FakeState(equity_age=99), "OPEN_LONG")
     assert any("stale" in r for r in reasons)
 
-def test_gate_soft_halt_blocks_opening():
+def test_gate_soft_halt_blocks_opening(monkeypatch):
+    import bot.execution as exmod
+    from decimal import Decimal as D
+    monkeypatch.setattr(exmod, "SOFT_HALT_EQUITY", D("965"))  # mechanism test at a reachable threshold
     reasons = gate_check(FakeState(equity=Decimal("900")), "OPEN_LONG")
     assert any("soft halt" in r for r in reasons)
 
