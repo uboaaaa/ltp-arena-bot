@@ -205,3 +205,14 @@ Fixes: (1) stance is now computed for the traded symbol; (2) NEW one-position
 invariant - any nonzero position on a different symbol refuses the entry
 outright; (3) describe_stance filters by the plan's symbol so the prompt and
 the gate can never disagree again. 3 regression tests added (122 total).
+
+## Boosted-only endgame mode (2026-08-11, user: ship it)
+The governing arithmetic, finally stated as policy: EV per trade = gross edge
+(~0, measured) minus fees (0.05%), so ordinary trades are a guaranteed drip
+of ~-$2-4/day at full frequency and size. The win condition lives entirely
+in the rare full-alignment trade (unanimous 3-of-3 vote + catalyst, ~$980
+boosted, trailing ratchet). BOOSTED_ONLY=True retires ordinary entries:
+passed votes without full alignment are journaled as BOOSTED_ONLY_SKIP and
+not traded. Expected effect: daily bleed to ~0, tail exposure retained at
+~1 strike every 1-2 days. This is the final strategic configuration of the
+campaign. Review: phase end.

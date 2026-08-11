@@ -27,6 +27,7 @@ from bot.config import (
     ENTRY_VOTE_ENABLED,
     ENTRY_VOTE_CALLS,
     ENTRY_VOTES_NEEDED,
+    BOOSTED_ONLY,
     CONF_FLOOR,
     UNANIMITY_SIZE_MULT,
     TREND_SCAN_INTERVAL,
@@ -233,7 +234,11 @@ async def strategy_loop(state: BotState) -> None:
                         if tally >= ENTRY_VOTES_NEEDED:
                             boost = UNANIMITY_SIZE_MULT if (tally == 3 and len(votes) == 3 and any(v.get("catalyst") is True for v in votes)) else None
                             log.info("ENTRY vote passed (%d of %d): proceeding with %s%s", tally, len(votes), decision["action"], " [UNANIMITY BOOST]" if boost else "")
-                            if boost:
+                            if BOOSTED_ONLY and boost is None:
+                                log.info("boosted-only mode: alignment incomplete (%d of %d, catalyst=%s) - skipping %s",
+                                         tally, len(votes), any(v.get("catalyst") is True for v in votes), decision["action"])
+                                entry["execution"] = {"transition" : "BOOSTED_ONLY_SKIP", "votes_for" : tally}
+                            elif boost:
                                 result = await asyncio.to_thread(execute_decision, state, decision, decision_id, vol_pct, chg_12h, range_pos, boost, active_symbol)
                             else:
                                 result = await asyncio.to_thread(execute_decision, state, decision, decision_id, vol_pct, chg_12h, range_pos, Decimal("1"), active_symbol)

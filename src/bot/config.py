@@ -61,6 +61,11 @@ EXIT_VOTES_NEEDED = 1   # first qualifying exit opinion closes immediately
 DAILY_LOSS_LIMIT = Decimal("5.0")  # 2026-08-04: max throttle needs ~1 boosted stop + 1 base stop of room per day   # block new entries when ranking-day pnl (16:00 UTC anchor) is below -this
 TREND_SCAN_INTERVAL = 150           # faster decision cadence while FLAT in a trending regime
 
+# --- boosted-only endgame (2026-08-11): EV/trade = ~0 gross - 0.05 fees, so
+# ordinary trades are a guaranteed drip (~-$2-4/day at full frequency). Only the
+# unanimous+catalyst max-size ratchet trade carries the win condition - trade nothing else.
+BOOSTED_ONLY = True
+
 # --- unanimity sizing: unanimous 3-of-3 entry vote + catalyst doubles size ---
 UNANIMITY_SIZE_MULT = Decimal("2")
 
