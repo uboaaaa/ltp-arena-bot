@@ -68,6 +68,7 @@ BOOSTED_ONLY = True
 
 # --- unanimity sizing: unanimous 3-of-3 entry vote + catalyst doubles size ---
 UNANIMITY_SIZE_MULT = Decimal("2")
+CATALYST_VOTES_NEEDED = 2  # 2026-08-12: catalyst flag is noisy on stale headlines; any-1-of-3 let Aug 11 chain-fire 3 strikes on one trend episode (-$6.07)
 
 # --- bot entry confirmation vote ---
 ENTRY_VOTE_ENABLED = True

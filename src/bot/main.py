@@ -30,6 +30,7 @@ from bot.config import (
     BOOSTED_ONLY,
     CONF_FLOOR,
     UNANIMITY_SIZE_MULT,
+    CATALYST_VOTES_NEEDED,
     TREND_SCAN_INTERVAL,
     CHOP_THRESHOLD_PCT
 )
@@ -232,11 +233,11 @@ async def strategy_loop(state: BotState) -> None:
                         tally = count_agreeing_votes(decision["action"], votes)
                         entry["entry_votes"] = [{"action" : v.get("action"), "confidence" : v.get("confidence"), "catalyst" : v.get("catalyst")} for v in votes]
                         if tally >= ENTRY_VOTES_NEEDED:
-                            boost = UNANIMITY_SIZE_MULT if (tally == 3 and len(votes) == 3 and any(v.get("catalyst") is True for v in votes)) else None
+                            boost = UNANIMITY_SIZE_MULT if (tally == 3 and len(votes) == 3 and count_catalyst_votes(votes) >= CATALYST_VOTES_NEEDED) else None
                             log.info("ENTRY vote passed (%d of %d): proceeding with %s%s", tally, len(votes), decision["action"], " [UNANIMITY BOOST]" if boost else "")
                             if BOOSTED_ONLY and boost is None:
-                                log.info("boosted-only mode: alignment incomplete (%d of %d, catalyst=%s) - skipping %s",
-                                         tally, len(votes), any(v.get("catalyst") is True for v in votes), decision["action"])
+                                log.info("boosted-only mode: alignment incomplete (%d of %d, catalyst %d of %d needed) - skipping %s",
+                                         tally, len(votes), count_catalyst_votes(votes), CATALYST_VOTES_NEEDED, decision["action"])
                                 entry["execution"] = {"transition" : "BOOSTED_ONLY_SKIP", "votes_for" : tally}
                             elif boost:
                                 result = await asyncio.to_thread(execute_decision, state, decision, decision_id, vol_pct, chg_12h, range_pos, boost, active_symbol)
@@ -265,6 +266,11 @@ async def strategy_loop(state: BotState) -> None:
             log.exception("strategy cycle failed. will retry next interval!")
         
         await asyncio.sleep(sleep_for)
+
+def count_catalyst_votes(votes):
+    """Number of entry-vote samples that self-reported a concrete catalyst."""
+    return sum(1 for v in votes if v.get("catalyst") is True)
+
 
 async def heartbeat(state: BotState) -> None:
     while True:
