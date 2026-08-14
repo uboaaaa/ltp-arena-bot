@@ -8,15 +8,24 @@ def _vote(catalyst):
     return {"action": "SHORT", "confidence": 0.7, "catalyst": catalyst}
 
 
-def boost_for(votes, tally=3):
-    # mirrors the expression in main.py's entry-vote branch
+def boost_for(votes, tally=3, needed=2):
+    # mirrors the expression in main.py's entry-vote branch; threshold pinned
+    # explicitly (2) rather than echoing live config, per the config-echo lesson
     return UNANIMITY_SIZE_MULT if (
-        tally == 3 and len(votes) == 3 and count_catalyst_votes(votes) >= CATALYST_VOTES_NEEDED
+        tally == 3 and len(votes) == 3 and count_catalyst_votes(votes) >= needed
     ) else None
 
 
-def test_catalyst_votes_needed_is_two():
-    assert CATALYST_VOTES_NEEDED == 2
+def test_catalyst_votes_needed_blocks_single_noisy_sample():
+    # >= 2 is the standing floor; 4 (> max samples) means entries are frozen entirely
+    assert CATALYST_VOTES_NEEDED >= 2
+
+
+def test_live_config_is_frozen():
+    # FREEZE 2026-08-14: no possible 3-sample vote can reach the live threshold,
+    # so no entry can ever qualify while this holds
+    votes = [_vote(True), _vote(True), _vote(True)]
+    assert count_catalyst_votes(votes) < CATALYST_VOTES_NEEDED
 
 
 def test_single_catalyst_sample_no_longer_boosts():
