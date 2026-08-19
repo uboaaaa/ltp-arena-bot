@@ -6,7 +6,10 @@ An autonomous crypto trading bot built for the Liquidity Arena AI Quant Competit
 I built this solo over four weeks as a deliberate double exercise. The first main objective was learning quantitative execution (risk controls, order mechanics, fee arithmetic, experiment design, etc) by operating a live system. The second was learning to engineer things with an AI-assisted pair programmer (Claude Code, in this case). The division of labor stayed fixed throughout: I conceptualized the strategy decisions, the invariants, and everything that shipped, while the AI focused on implementation and analysis. Nothing was implemented unreviewed. Every strategy change was pre-registered in `docs/experiments.md` before going live, every incident closed with a regression test, and both audits in the commit history found their biggest bugs under "fully green" testing environments.
 
 # Some features:
-
+- A complete autonomous trading system that ran 24/7 for about three weeks. Built using asyncio Python, systemd-managed on an EC2 instance in Tokyo, and real leveraged orders with real fills and real fees.
+- A running operational record, right here in the repo. 140,000+ lines of live logs (src/bot.log.1 / .2, covering July 18 – August 10) with every decision the bot made, including actions, confidence levels, reasonings, execution summaries, and equity marks. 
+- A measurement culture under pressure. Every experiment pre-registered in docs/experiments.md with caps and abort criteria before it shipped, counterfactual replay of real trades against real candles as the default judge of every idea.
+- Seven production incidents, all of which stemmed from the same roots (i.e., passing all tests successfully, but leading to bad behavior). Each is documented with its fix, its regression test, and the changes that patched those problems for good.
 # Architecture
 The bot in its initial state way back when the competition started was actually very simple: query the MiniMax M3 model, politely yet firmly ask it to structure its responses in a certain way, then make trades based off that. Many aspects of the final iteration came about through backtesting on then-current trading histories, experimentation, and raw intuition (for better or worse). The final decision pipeline is as follows:
 
@@ -23,7 +26,7 @@ The bot in its initial state way back when the competition started was actually 
 # Some conclusions:
 
 # Anatomy
-
+```
 src/bot/
   main.py                 # strategy loop, voting, boosted gate
   execution.py            # order placement, brackets, ratchet, breaker, invariants
@@ -36,6 +39,7 @@ scripts/
 docs/experiments.md       # every experiment: pre-registration, cap, verdict
 tests/                    # 129 tests, one regression test per incident
 src/data/decisions.jsonl  # the dataset (~3k records)
+```
 
 # Status
 The competition phase ended August 21, 2026. The bot was deliberately frozen for the final week (with entries disabled, exits and safety rails live) once the boosted cohort review killed the last remaining thesis; under the competition's massive emphasis on Sharpe-weighted scoring (which comprised 40% of the total score), NOT trading strictly dominated trading without edge. The service is now stopped. RIP. 
