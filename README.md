@@ -24,6 +24,9 @@ The bot in its initial state way back when the competition started was actually 
 9. **Safety guards**: a daily loss-breaker of $5 a day, the ability to hold only one position at a time, hard equity floors before all trading stops completely, and stop-out re-entry cooldowns (i.e., don't enter a trade for a certain amount of time if the last one was a loss. No tilting!).
 
 # Some conclusions:
+Given this was my first ever project dealing with this field, some painful lessons were learned. For instance:
+- The LLM-signal had no edge whatsoever on its own and presented some unique problems. For instance, even mentioning confidence values by number in the prompt header would cause it to stick to those values for good (for example, mentioning "0.65" as a decent level for promising trades would cause it to use that exact value no matter what).
+- Broker fees comprised >50% of the losses on active days. High-frequency trading + taker fees + no edge is guaranteed to cause bleeds (around ~$2-$4 at our scale), regardless of market conditions
 
 # Anatomy
 ```
